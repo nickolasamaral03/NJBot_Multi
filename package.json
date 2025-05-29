@@ -13,7 +13,12 @@
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
     "@hapi/boom": "^10.0.1",
-    "@whiskeysockets/baileys": "^6.7.17",
+    "@whiskeysockets/baileys": "^6.7.18",
+    "cors": "^2.8.5",
+    "dotenv": "^16.5.0",
+    "express": "^5.1.0",
+    "mongoose": "^8.15.1",
+    "qrcode": "^1.5.4",
     "qrcode-terminal": "^0.12.0"
   }
 }
