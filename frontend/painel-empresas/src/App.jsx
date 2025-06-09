@@ -1,38 +1,55 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
-import './index.css' 
+import styled from "styled-components"
+import NovaEmpresa from "./components/EmpresaForm"
+import EmpresasList from "./components/EmpresaList"
+
+const Titulo = styled.h1`
+  font-size: 2rem;
+  color: royalblue;
+  font-weight: bold;
+`
+
+const Container = styled.div`
+  padding: 20px;
+`
+
+const BotaoAtualizar = styled.button`
+  margin-bottom: 1rem;
+  padding: 0.5rem 1rem;
+  background-color: royalblue;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-weight: bold;
+  
+  &:hover {
+    background-color: darkblue;
+  }
+`
 
 function App() {
-  const [count, setCount] = useState(0)
+  const atualizarPagina = () => {
+    window.location.reload()
+  }
 
   return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.jsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-      <div className="text-2xl text-red-500 font-bold">Tailwind funcionando!</div>
-
-    </>
+    <Container>
+      <Titulo>Bem-vindo ao Painel de Empresas</Titulo>
+      <BotaoAtualizar onClick={atualizarPagina}>Atualizar Página</BotaoAtualizar>
+      <NovaEmpresa />
+      <EmpresasList />
+    </Container>
   )
 }
 
 export default App
+
+// O que já temos:
+// - Cadastro de empresa com geração de QR Code
+// - Reinício do bot para gerar novo QR Code
+
+// Agora precisamos:
+// Melhorar o fluxo entre humano e bot para responder
+// Desativar não está funcionando
+// Refinar o chatbot para responder de uma melhor maneira
+// Melhorar o front-end, adicionar mais estilos e responsividade
