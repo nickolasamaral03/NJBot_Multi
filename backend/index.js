@@ -6,10 +6,8 @@ const cors = require('cors');
 const mongoose = require('mongoose');
 require('dotenv').config();
 const { gerarRespostaGemini } = require('./gemini');
-
 const { default: makeWASocket, DisconnectReason, useMultiFileAuthState } = require('@whiskeysockets/baileys');
 const { Boom } = require('@hapi/boom');
-
 const Empresa = require('./models/Empresa');
 
 const app = express();
@@ -18,7 +16,6 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
-// Conectar ao MongoDB
 mongoose.connect(process.env.MONGO_URI, {
   useNewUrlParser: true,
   useUnifiedTopology: true
@@ -29,14 +26,13 @@ mongoose.connect(process.env.MONGO_URI, {
 });
 
 const bots = {};
-const atendimentosManuais = {}; // { empresaNome: { ativo: true, ultimoContato: Date } }
+const atendimentosManuais = {}; // { 'empresa_cliente': { ativo, ultimoContato } }
 const qrCodesGerados = {}; // { nomeEmpresa: base64QRCode }
 
 async function chamarIA(promptIA, mensagemUsuario) {
   return await gerarRespostaGemini(promptIA, mensagemUsuario);
 }
 
-// Função principal para iniciar bot
 async function iniciarBot(empresa) {
   const pasta = path.join(__dirname, 'bots', empresa.nome, 'auth_info_baileys');
   if (!fs.existsSync(pasta)) fs.mkdirSync(pasta, { recursive: true });
@@ -56,7 +52,7 @@ async function iniciarBot(empresa) {
 
     if (qr) {
       qrCodesGerados[empresa.nome] = await qrcode.toDataURL(qr);
-      resolveQRCode(qr); // Libera a Promise
+      resolveQRCode(qr);
     }
 
     if (connection === 'close') {
@@ -69,69 +65,103 @@ async function iniciarBot(empresa) {
     }
   });
 
-  sock.ev.on('messages.upsert', async (m) => {
+sock.ev.on('messages.upsert', async (m) => {
+  try {
     const msg = m.messages[0];
-    if (!msg.message || msg.key.fromMe) return;
+    if (!msg.message) return;
 
     const sender = msg.key.remoteJid;
     const texto = msg.message.conversation || msg.message.extendedTextMessage?.text || '';
+    const textoLower = texto.toLowerCase();
     const idEmpresa = empresa.nome;
+    const chaveAtendimento = `${idEmpresa}_${sender}`;
 
-    // Atendimento humano ativado
-    if (atendimentosManuais[idEmpresa]?.ativo) {
-      atendimentosManuais[idEmpresa].ultimoContato = new Date();
+    // Comandos que ativam atendimento humano (exemplo)
+    const comandosAtivarHumano = ['atendente', 'suporte', 'humano'];
+
+    // Comando para voltar ao bot imediatamente
+    if (textoLower === '#bot' || textoLower === 'bot' || textoLower === 'voltar ao bot') {
+      atendimentosManuais[chaveAtendimento] = { ativo: false, ultimoContato: null };
+      await sock.sendMessage(sender, { text: '🤖 Atendimento automático reativado.' });
       return;
     }
 
-    // Encerrar atendimento humano
-    if (texto.toLowerCase().includes("encerrar atendimento")) {
-      atendimentosManuais[idEmpresa] = { ativo: false, ultimoContato: null };
-      await sock.sendMessage(sender, { text: '🤖 Atendimento encerrado. O bot está ativo novamente.' });
+    // Detecta se é mensagem do atendente humano
+    // Assumindo que mensagens enviadas pelo atendente são do próprio dispositivo (key.fromMe === true)
+    // Você pode adaptar essa lógica conforme sua arquitetura
+    const isMensagemAtendente = msg.key.fromMe === true;
+
+    if (isMensagemAtendente) {
+      // Atendente humano respondeu, atualiza ultimoContato para resetar o timer
+      if (atendimentosManuais[chaveAtendimento]?.ativo) {
+        atendimentosManuais[chaveAtendimento].ultimoContato = new Date();
+        console.log(`Atualizado ultimoContato para ${chaveAtendimento}`);
+      }
+      return; // não processa mais nada, não responde com IA
+    }
+
+    // Se o usuário pediu atendimento humano
+    if (comandosAtivarHumano.some(cmd => textoLower.includes(cmd))) {
+      atendimentosManuais[chaveAtendimento] = { ativo: true, ultimoContato: new Date() };
+      await sock.sendMessage(sender, { text: '👤 Atendimento humano ativado. Por favor, aguarde o atendente.' });
       return;
     }
 
-    // Ativar atendimento humano
-    if (texto.toLowerCase().includes("#humano")) {
-      atendimentosManuais[idEmpresa] = {
-        ativo: true,
-        ultimoContato: new Date()
-      };
-      await sock.sendMessage(sender, { text: '👤 Um atendente humano vai falar com você em breve.' });
+    // Se atendimento humano está ativo para esse usuário, bloqueia resposta IA
+    if (atendimentosManuais[chaveAtendimento]?.ativo) {
+      // Atualiza ultimoContato para manter o timer ativo caso o usuário continue respondendo
+      atendimentosManuais[chaveAtendimento].ultimoContato = new Date();
+      console.log(`Atendimento manual ativo para ${chaveAtendimento}, bot ignorado.`);
+      return; // Não responde com IA
+    }
+
+    // Aqui atendimento automático ativo, processa IA
+    const dadosAtualizadosEmpresa = await Empresa.findOne({ nome: empresa.nome });
+    if (!dadosAtualizadosEmpresa?.botAtivo) {
+      console.log('Bot desativado para empresa:', empresa.nome);
       return;
     }
 
     const respostaIA = await chamarIA(empresa.promptIA, texto);
     await sock.sendMessage(sender, { text: respostaIA });
-  });
+
+  } catch (error) {
+    console.error('Erro ao processar mensagem:', error);
+  }
+});
+
 
   bots[empresa.nome] = sock;
 
   return { sock, qrCodePromise };
 }
-
-// Verificação periódica de inatividade no atendimento humano
+// Função que roda a cada minuto para verificar tempo de inatividade do atendimento humano
 setInterval(() => {
   const agora = new Date();
-  for (const [empresa, info] of Object.entries(atendimentosManuais)) {
-    if (info.ativo && agora - info.ultimoContato > 10 * 60 * 1000) {
-      console.log(`⏳ Atendimento humano inativo. Retornando para bot: ${empresa}`);
-      atendimentosManuais[empresa].ativo = false;
+  for (const chave in atendimentosManuais) {
+    const atendimento = atendimentosManuais[chave];
+    if (atendimento.ativo && atendimento.ultimoContato) {
+      const diffMinutos = (agora - atendimento.ultimoContato) / 1000 / 60;
+      if (diffMinutos >= 10) {
+        // Passaram 10 minutos sem contato, volta atendimento automático
+        atendimentosManuais[chave] = { ativo: false, ultimoContato: null };
+        // Se quiser enviar mensagem ao usuário avisando, pode fazer aqui (precisa ter acesso ao sock e sender)
+        // Exemplo: sock.sendMessage(sender, { text: '🤖 Atendimento automático reativado após inatividade.' });
+      }
     }
   }
-}, 60 * 1000);
+}, 60 * 1000); // a cada 1 minuto
 
-module.exports = { iniciarBot, bots, atendimentosManuais };
 
-// Inicia todos os bots existentes no banco
+// Iniciar todos os bots do banco
 async function iniciarTodosBots() {
   const empresas = await Empresa.find();
   empresas.forEach((empresa) => iniciarBot(empresa));
 }
 iniciarTodosBots();
 
-// --- Rotas ---
+// ROTAS
 
-// Cadastrar nova empresa e iniciar bot
 app.post('/api/empresas', async (req, res) => {
   const { nome, promptIA, telefone, ativo } = req.body;
 
@@ -157,7 +187,6 @@ app.post('/api/empresas', async (req, res) => {
   }
 });
 
-// Listar empresas
 app.get('/api/empresas', async (req, res) => {
   try {
     const empresas = await Empresa.find();
@@ -168,7 +197,6 @@ app.get('/api/empresas', async (req, res) => {
   }
 });
 
-// Obter último QR gerado (ajustando para receber id e buscar empresa)
 app.get('/api/qr/:id', async (req, res) => {
   const { id } = req.params;
   try {
@@ -183,7 +211,7 @@ app.get('/api/qr/:id', async (req, res) => {
     if (qr) {
       return res.json({ qrCode: qr });
     } else {
-      return res.status(204).json(); // No Content
+      return res.status(204).json();
     }
   } catch (error) {
     console.error(error);
@@ -191,7 +219,6 @@ app.get('/api/qr/:id', async (req, res) => {
   }
 });
 
-// Atualizar empresa
 app.put('/api/empresas/:id', async (req, res) => {
   const { id } = req.params;
   const { nome, promptIA, telefone, botAtivo } = req.body;
@@ -205,18 +232,13 @@ app.put('/api/empresas/:id', async (req, res) => {
     if (!empresaAntiga) return res.status(404).json({ error: 'Empresa não encontrada.' });
 
     const empresaAtualizada = await Empresa.findByIdAndUpdate(
-      id,
-      { nome, promptIA, telefone, botAtivo },
-      { new: true, runValidators: true }
+      id, { nome, promptIA, telefone, botAtivo }, { new: true, runValidators: true }
     );
 
-    // Renomear pasta se o nome mudou
     if (empresaAntiga.nome !== nome) {
       const oldPath = path.join(__dirname, 'bots', empresaAntiga.nome);
       const newPath = path.join(__dirname, 'bots', nome);
-      if (fs.existsSync(oldPath)) {
-        fs.renameSync(oldPath, newPath);
-      }
+      if (fs.existsSync(oldPath)) fs.renameSync(oldPath, newPath);
     }
 
     const pasta = path.join(__dirname, 'bots', nome);
@@ -230,8 +252,6 @@ app.put('/api/empresas/:id', async (req, res) => {
   }
 });
 
-
-// Reiniciar bot e gerar novo QR Code (ajustando para buscar por id)
 app.post('/api/reiniciar-bot/:id', async (req, res) => {
   const { id } = req.params;
   try {
@@ -242,11 +262,9 @@ app.post('/api/reiniciar-bot/:id', async (req, res) => {
     const empresa = await Empresa.findById(id);
     if (!empresa) return res.status(404).json({ error: 'Empresa não encontrada.' });
 
-    // Remove autenticação antiga
     const authPath = path.join(__dirname, 'bots', empresa.nome, 'auth_info_baileys');
     if (fs.existsSync(authPath)) fs.rmSync(authPath, { recursive: true, force: true });
 
-    // Reinicia bot e espera novo QR
     const { qrCodePromise } = await iniciarBot(empresa);
     const qrRaw = await qrCodePromise;
     const qrCode = await qrcode.toDataURL(qrRaw);
@@ -258,52 +276,25 @@ app.post('/api/reiniciar-bot/:id', async (req, res) => {
   }
 });
 
-
-// Deletar empresa e remover pasta correspondente
 app.delete('/api/empresas/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({ error: 'ID inválido' });
     }
 
-    // Encontra a empresa antes de deletar para obter o nome
     const empresa = await Empresa.findById(id);
-    if (!empresa) {
-      return res.status(404).json({ message: 'Empresa não encontrada' });
-    }
+    if (!empresa) return res.status(404).json({ message: 'Empresa não encontrada' });
 
-    // Deleta a empresa do banco de dados
     await Empresa.findByIdAndDelete(id);
 
-    // Remove a pasta da empresa
     const pastaEmpresa = path.join(__dirname, 'bots', empresa.nome);
-    console.log(`Tentando remover pasta da empresa: ${pastaEmpresa}`);
-    
     if (fs.existsSync(pastaEmpresa)) {
-      try {
-        // Remove a pasta recursivamente
-        fs.rmSync(pastaEmpresa, { recursive: true, force: true });
-        console.log(`Pasta da empresa "${empresa.nome}" removida com sucesso.`);
-      } catch (err) {
-        console.error(`Erro ao remover pasta da empresa "${empresa.nome}":`, err);
-        // Não falha a operação principal se a exclusão da pasta falhar
-      }
-    } else {
-      console.log(`Pasta da empresa "${empresa.nome}" não encontrada.`);
+      fs.rmSync(pastaEmpresa, { recursive: true, force: true });
     }
 
-    if (fs.existsSync(pastaEmpresa)) {
-      console.error(`Falha crítica: A pasta ${pastaEmpresa} ainda existe após tentativa de exclusão`);
-    } else {
-      console.log(`Pasta ${pastaEmpresa} removida com sucesso`);
-    }
-
-    // Remove qualquer QR code armazenado em memória
     delete qrCodesGerados[empresa.nome];
 
-    // Remove o bot da lista de bots ativos, se existir
     if (bots[empresa.nome]) {
       try {
         await bots[empresa.nome].ws.close();
@@ -320,8 +311,6 @@ app.delete('/api/empresas/:id', async (req, res) => {
   }
 });
 
-
-// Alternar bot ativo (ajustando para usar id)
 app.put('/api/empresas/:id/toggle-bot', async (req, res) => {
   try {
     const { id } = req.params;
@@ -335,6 +324,26 @@ app.put('/api/empresas/:id/toggle-bot', async (req, res) => {
     empresa.botAtivo = !empresa.botAtivo;
     await empresa.save();
 
+    // Se desativou, fecha conexão do bot e remove do objeto bots
+    if (!empresa.botAtivo && bots[empresa.nome]) {
+      try {
+        await bots[empresa.nome].ws.close();
+        delete bots[empresa.nome];
+        console.log(`Bot de ${empresa.nome} foi desligado.`);
+      } catch (err) {
+        console.error(`Erro ao desligar bot de ${empresa.nome}:`, err);
+      }
+    }
+
+    // Se ativou, inicia o bot novamente
+    if (empresa.botAtivo && !bots[empresa.nome]) {
+      iniciarBot(empresa).then(() => {
+        console.log(`Bot de ${empresa.nome} foi iniciado.`);
+      }).catch(err => {
+        console.error(`Erro ao iniciar bot de ${empresa.nome}:`, err);
+      });
+    }
+
     res.status(200).json({ botAtivo: empresa.botAtivo });
   } catch (error) {
     console.error('Erro ao alternar bot:', error);
@@ -342,7 +351,6 @@ app.put('/api/empresas/:id/toggle-bot', async (req, res) => {
   }
 });
 
-// Start do servidor
 app.listen(PORT, () => {
   console.log(`🚀 Backend rodando em http://localhost:${PORT}`);
 });

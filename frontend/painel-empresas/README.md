@@ -1,12 +1,17 @@
-# React + Vite
+<!-- FUNCIONANDO: -->
+<!-- Cadastro de novas empresas: -->
+<!-- Opção de bot ativo ou não -->
+<!-- Gerar QRCode -->
+<!-- Gerar novamente o QRcode: -->
+<!-- Deletar e editar empresa -->
+<!-- FLUXO OK -->
+<!-- Deixar página bonita -->
+<!-- Fazer um login e senha com muita segurança -->
+<!-- Melhorar mensagem de boas vindas? -->
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
-
-Currently, two official plugins are available:
-
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+<!-- Melhorar: 1.2 -->
+<!-- Fluxo de humano e bot: Quando o humano responder bot interrompe e quando quiser que volte para o bot tenha uma ou mais palavras chaves -->
+<!-- Mais opções de IA: -->
+<!-- Melhorar questões de resposta mais humanizado -->
+<!-- Pensar em como o cliente poderá acessar a dashboard -->
+<!-- Suporte para audios e imagens -->

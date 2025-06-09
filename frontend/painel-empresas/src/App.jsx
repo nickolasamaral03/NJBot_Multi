@@ -44,12 +44,10 @@ function App() {
 
 export default App
 
-// O que já temos:
-// - Cadastro de empresa com geração de QR Code
-// - Reinício do bot para gerar novo QR Code
-
 // Agora precisamos:
-// Melhorar o fluxo entre humano e bot para responder
-// Desativar não está funcionando
+
+// Fluxo atual: Se precisa conversar com humano coloque na conversa e vai para o humano, se ficar 10 minutos inativo voltará para o bot
+// Melhorar o fluxo na segunda atualização: O usuario conseguir interromper a IA e responder, usuario conseguir voltar a IA com alguma palavra chave
+
 // Refinar o chatbot para responder de uma melhor maneira
 // Melhorar o front-end, adicionar mais estilos e responsividade
