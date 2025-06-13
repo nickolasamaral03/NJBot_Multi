@@ -10,9 +10,11 @@
 <!-- Melhorar mensagem de boas vindas? -->
 
 <!-- Melhorar: -->
-<!-- Fluxo de humano e bot: Quando o humano responder bot interrompe e quando quiser que volte para o bot tenha uma ou mais palavras chaves 1.0 -->
+<!-- PRIMEIRO: -->
+<!-- Fluxo de humano e bot: Humano está conseguindo interropemper o bot somente não conseguindo retornar o bot de imediato 1.0 -->
 <!-- Fazer um login e senha com muita segurança -->
 
+<!-- DEPOIS -->
 <!-- Testar mais o projeto -->
 <!-- Será que não posso reconectar novamente? -->
 <!-- Muito bugado -->
