@@ -65,6 +65,73 @@ async function iniciarBot(empresa) {
     }
   });
 
+// sock.ev.on('messages.upsert', async (m) => {
+//   try {
+//     const msg = m.messages[0];
+//     if (!msg.message) return;
+
+//     const sender = msg.key.remoteJid;
+//     const texto = msg.message.conversation || msg.message.extendedTextMessage?.text || '';
+//     const textoLower = texto.toLowerCase();
+//     const idEmpresa = empresa.nome;
+//     const chaveAtendimento = `${idEmpresa}_${sender}`;
+
+//     // Palavras-chave que ativam atendimento humano
+//     const comandosAtivarHumano = ['atendente', 'suporte', 'humano'];
+
+//     // Comandos para reativar o bot
+//     if (['#bot', 'bot', 'voltar ao bot'].includes(textoLower)) {
+//       atendimentosManuais[chaveAtendimento] = { ativo: false, ultimoContato: null };
+//       await sock.sendMessage(sender, { text: '🤖 Atendimento automático reativado.' });
+//       console.log(`🤖 Bot reativado manualmente para ${chaveAtendimento}`);
+//       return;
+//     }
+
+//     // Detecta se a mensagem é do atendente humano (mensagem enviada pelo próprio dispositivo)
+//     const isMensagemAtendente = msg.key.fromMe === true;
+
+//     if (isMensagemAtendente) {
+//       if (!atendimentosManuais[chaveAtendimento]?.ativo) {
+//         atendimentosManuais[chaveAtendimento] = { ativo: true, ultimoContato: new Date() };
+//         console.log(`🧑‍💻 Atendimento humano ativado automaticamente após resposta do atendente (${chaveAtendimento})`);
+//       } else {
+//         atendimentosManuais[chaveAtendimento].ultimoContato = new Date();
+//         console.log(`🧑‍💻 Atendente respondeu, atualizado ultimoContato para ${chaveAtendimento}`);
+//       }
+//       return; // nunca responde IA se for do atendente
+//     }
+
+//     // Se o usuário pedir por atendimento humano
+//     if (comandosAtivarHumano.some(cmd => textoLower.includes(cmd))) {
+//       atendimentosManuais[chaveAtendimento] = { ativo: true, ultimoContato: new Date() };
+//       await sock.sendMessage(sender, { text: '👤 Atendimento humano ativado. Por favor, aguarde o atendente.' });
+//       console.log(`👤 Atendimento humano ativado manualmente para ${chaveAtendimento}`);
+//       return;
+//     }
+
+//     // Se atendimento humano está ativo, IA não responde
+//     if (atendimentosManuais[chaveAtendimento]?.ativo) {
+//       atendimentosManuais[chaveAtendimento].ultimoContato = new Date(); // atualiza para manter sessão ativa
+//       console.log(`⏸️ Bot pausado: atendimento humano ativo para ${chaveAtendimento}`);
+//       return;
+//     }
+
+//     // Atendimento automático: gera resposta IA
+//     const dadosAtualizadosEmpresa = await Empresa.findOne({ nome: empresa.nome });
+//     if (!dadosAtualizadosEmpresa?.botAtivo) {
+//       console.log('⛔ Bot desativado para empresa:', empresa.nome);
+//       return;
+//     }
+
+//     const respostaIA = await chamarIA(empresa.promptIA, texto);
+//     await sock.sendMessage(sender, { text: respostaIA });
+//     console.log(`🤖 Resposta enviada pelo bot para ${chaveAtendimento}`);
+
+//   } catch (error) {
+//     console.error('❌ Erro ao processar mensagem:', error);
+//   }
+// });
+
 sock.ev.on('messages.upsert', async (m) => {
   try {
     const msg = m.messages[0];
@@ -76,8 +143,8 @@ sock.ev.on('messages.upsert', async (m) => {
     const idEmpresa = empresa.nome;
     const chaveAtendimento = `${idEmpresa}_${sender}`;
 
-    // Palavras-chave que ativam atendimento humano
-    const comandosAtivarHumano = ['atendente', 'suporte', 'humano'];
+    // Comando exato que ativa o atendimento humano
+    const comandoAtivarHumano = 'atendente';
 
     // Comandos para reativar o bot
     if (['#bot', 'bot', 'voltar ao bot'].includes(textoLower)) {
@@ -87,22 +154,20 @@ sock.ev.on('messages.upsert', async (m) => {
       return;
     }
 
-    // Detecta se a mensagem é do atendente humano (mensagem enviada pelo próprio dispositivo)
+    // Detecta se a mensagem foi enviada pelo próprio dispositivo (atendente)
     const isMensagemAtendente = msg.key.fromMe === true;
 
     if (isMensagemAtendente) {
-      if (!atendimentosManuais[chaveAtendimento]?.ativo) {
-        atendimentosManuais[chaveAtendimento] = { ativo: true, ultimoContato: new Date() };
-        console.log(`🧑‍💻 Atendimento humano ativado automaticamente após resposta do atendente (${chaveAtendimento})`);
-      } else {
+      // Não ativa atendimento humano automaticamente — apenas registra a atividade se já estiver ativo
+      if (atendimentosManuais[chaveAtendimento]?.ativo) {
         atendimentosManuais[chaveAtendimento].ultimoContato = new Date();
         console.log(`🧑‍💻 Atendente respondeu, atualizado ultimoContato para ${chaveAtendimento}`);
       }
       return; // nunca responde IA se for do atendente
     }
 
-    // Se o usuário pedir por atendimento humano
-    if (comandosAtivarHumano.some(cmd => textoLower.includes(cmd))) {
+    // Se o usuário pedir por "atendente", ativa atendimento humano
+    if (textoLower.includes(comandoAtivarHumano)) {
       atendimentosManuais[chaveAtendimento] = { ativo: true, ultimoContato: new Date() };
       await sock.sendMessage(sender, { text: '👤 Atendimento humano ativado. Por favor, aguarde o atendente.' });
       console.log(`👤 Atendimento humano ativado manualmente para ${chaveAtendimento}`);
@@ -131,6 +196,8 @@ sock.ev.on('messages.upsert', async (m) => {
     console.error('❌ Erro ao processar mensagem:', error);
   }
 });
+
+
 
   bots[empresa.nome] = sock;
 
