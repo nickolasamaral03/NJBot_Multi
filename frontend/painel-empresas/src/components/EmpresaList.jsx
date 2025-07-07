@@ -540,5 +540,3 @@ const EmpresasList = () => {
 
 export default EmpresasList;
 
-// FAZER UM INPUT PARA BUSCAR EMPRESAS
-// AJUSTAR VISUALIZAÇÃO DO PROMPT NA TELA
