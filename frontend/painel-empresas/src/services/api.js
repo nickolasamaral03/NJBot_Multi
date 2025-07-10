@@ -1,23 +1,14 @@
-// import axios from 'axios';
-
-// export default axios.create({
-//   baseURL: 'http://localhost:3000/api'
-// });
-
-
 import axios from 'axios';
 
-// Cria uma instância customizada do axios
 const api = axios.create({
-  baseURL: 'http://localhost:3000/api',
-  timeout: 10000, // 10 segundos de timeout
+  baseURL: import.meta.env.VITE_API_URL + '/api',
+  timeout: 10000,
   headers: {
     'Content-Type': 'application/json',
     'Accept': 'application/json'
   }
 });
 
-// Interceptor para adicionar token de autenticação (se necessário)
 api.interceptors.request.use(config => {
   const token = localStorage.getItem('token');
   if (token) {
@@ -28,11 +19,9 @@ api.interceptors.request.use(config => {
   return Promise.reject(error);
 });
 
-// Interceptor para tratamento global de erros
 api.interceptors.response.use(response => {
   return response;
 }, error => {
-  // Tratamento personalizado para diferentes códigos de status
   if (error.response) {
     switch (error.response.status) {
       case 401:
@@ -52,7 +41,7 @@ api.interceptors.response.use(response => {
   } else {
     console.error('Erro ao configurar a requisição:', error.message);
   }
-  
+
   return Promise.reject(error);
 });
 
