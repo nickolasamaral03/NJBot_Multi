@@ -357,6 +357,3 @@ app.get('/', (req, res) => {
   res.send('🤖 API do NJBot está rodando!');
 });
 
-app.listen(PORT, () => {
-  console.log(`🚀 Backend rodando em http://localhost:${PORT}`);
-});
