@@ -121,6 +121,9 @@ sock.ev.on('messages.upsert', async (m) => {
       return;
     }
 
+    await sock.sendPresenceUpdate('composing', sender);
+    await new Promise(resolve => setTimeout(resolve, 3000));
+
     const respostaIA = await chamarIA(empresa.promptIA, texto);
     await sock.sendMessage(sender, { text: respostaIA });
     console.log(`🤖 Resposta enviada pelo bot para ${chaveAtendimento}`);
