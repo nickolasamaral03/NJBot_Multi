@@ -1,7 +1,58 @@
+// import axios from 'axios';
+
+// const api = axios.create({
+//   baseURL: import.meta.env.VITE_API_URL + 'api',
+//   timeout: 10000,
+//   headers: {
+//     'Content-Type': 'application/json',
+//     'Accept': 'application/json'
+//   }
+// });
+
+// api.interceptors.request.use(config => {
+//   const token = localStorage.getItem('token');
+//   if (token) {
+//     config.headers.Authorization = `Bearer ${token}`;
+//   }
+//   return config;
+// }, error => {
+//   return Promise.reject(error);
+// });
+
+// api.interceptors.response.use(response => {
+//   return response;
+// }, error => {
+//   if (error.response) {
+//     switch (error.response.status) {
+//       case 401:
+//         console.error('Não autorizado - redirecionar para login');
+//         break;
+//       case 404:
+//         console.error('Endpoint não encontrado');
+//         break;
+//       case 500:
+//         console.error('Erro interno do servidor');
+//         break;
+//       default:
+//         console.error('Erro na requisição:', error.message);
+//     }
+//   } else if (error.request) {
+//     console.error('Sem resposta do servidor');
+//   } else {
+//     console.error('Erro ao configurar a requisição:', error.message);
+//   }
+
+//   return Promise.reject(error);
+// });
+
+// export default api;
+
+
 import axios from 'axios';
 
+// Use a URL local fixa para desenvolvimento
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL + 'api',
+  baseURL: 'http://localhost:3000/api',
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',
@@ -9,6 +60,7 @@ const api = axios.create({
   }
 });
 
+// Interceptor de requisição – insere token de autenticação se existir
 api.interceptors.request.use(config => {
   const token = localStorage.getItem('token');
   if (token) {
@@ -19,27 +71,30 @@ api.interceptors.request.use(config => {
   return Promise.reject(error);
 });
 
+// Interceptor de resposta – tratamento global de erros
 api.interceptors.response.use(response => {
   return response;
 }, error => {
   if (error.response) {
     switch (error.response.status) {
       case 401:
-        console.error('Não autorizado - redirecionar para login');
+        console.error('🔒 Não autorizado - redirecionando para login...');
+        // Redireciona para a tela de login se desejar:
+        // window.location.href = '/login';
         break;
       case 404:
-        console.error('Endpoint não encontrado');
+        console.error('🚫 Endpoint não encontrado:', error.config.url);
         break;
       case 500:
-        console.error('Erro interno do servidor');
+        console.error('💥 Erro interno do servidor');
         break;
       default:
-        console.error('Erro na requisição:', error.message);
+        console.error('⚠️ Erro na requisição:', error.message);
     }
   } else if (error.request) {
-    console.error('Sem resposta do servidor');
+    console.error('❌ Sem resposta do servidor (backend pode estar offline)');
   } else {
-    console.error('Erro ao configurar a requisição:', error.message);
+    console.error('⚙️ Erro ao configurar a requisição:', error.message);
   }
 
   return Promise.reject(error);

@@ -9,6 +9,9 @@ const { gerarRespostaGemini } = require('./gemini');
 const { default: makeWASocket, DisconnectReason, useMultiFileAuthState } = require('@whiskeysockets/baileys');
 const { Boom } = require('@hapi/boom');
 const Empresa = require('./models/Empresa');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+const Usuario = require('./models/Usuario');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -163,6 +166,36 @@ async function iniciarTodosBots() {
 iniciarTodosBots();
 
 // ROTAS
+app.post('/api/registrar', async (req, res) => {
+  const { nome, email, senha } = req.body;
+
+  try {
+    const senhaHash = await bcrypt.hash(senha, 10);
+    const novoUsuario = await Usuario.create({ nome, email, senhaHash });
+    res.status(201).json({ mensagem: 'Usuário criado com sucesso!' });
+  } catch (err) {
+    res.status(400).json({ erro: 'Erro ao criar usuário' });
+  }
+});
+
+app.post('/api/login', async (req, res) => {
+  const { email, senha } = req.body;
+
+  try {
+    const usuario = await Usuario.findOne({ email });
+    if (!usuario) return res.status(401).json({ erro: 'Usuário não encontrado' });
+
+    const senhaValida = await bcrypt.compare(senha, usuario.senhaHash);
+    if (!senhaValida) return res.status(401).json({ erro: 'Senha inválida' });
+
+    const token = jwt.sign({ id: usuario._id }, process.env.JWT_SECRET, { expiresIn: '8h' });
+
+    res.json({ token, nome: usuario.nome, email: usuario.email });
+  } catch (err) {
+    res.status(500).json({ erro: 'Erro no login' });
+  }
+});
+
 
 app.post('/api/empresas', async (req, res) => {
   const { nome, promptIA, telefone, ativo } = req.body;
@@ -355,5 +388,9 @@ app.put('/api/empresas/:id/toggle-bot', async (req, res) => {
 
 app.get('/', (req, res) => {
   res.send('🤖 API do NJBot está rodando!');
+});
+
+app.listen(PORT, () => {
+  console.log(`🚀 Backend rodando em http://localhost:${PORT}`);
 });
 
