@@ -1,55 +1,92 @@
-import styled from "styled-components"
-import NovaEmpresa from "./components/EmpresaForm"
-import EmpresasList from "./components/EmpresaList"
+// import styled, { createGlobalStyle } from "styled-components"
+// import NovaEmpresa from "./components/EmpresaForm"
+// import EmpresasList from "./components/EmpresaList"
+// import Header from '../src/components/Header'
 
-const Titulo = styled.h1`
-  font-size: 2rem;
-  color: royalblue;
-  font-weight: bold;
-`
+// const GlobalStyle = createGlobalStyle`
+//   html, body, #root {
+//     margin: 0;
+//     padding: 0;
+//     min-height: 100%;
+//     background-color:rgba(13, 27, 42, 0.77); /* azul escuro */
+//     font-family: sans-serif;
+//   }
 
-const Container = styled.div`
-  padding: 20px;
-`
+//   body {
+//     background-color: #0d1b2a;
+//   }
+// `
+// const Container = styled.div`
+//    min-height: 100%;
+//   padding: 20px;
+//   display: flex;
+//   flex-direction: column;
+//   align-items: center;
+// `
 
-const BotaoAtualizar = styled.button`
-  margin-bottom: 1rem;
-  padding: 0.5rem 1rem;
-  background-color: royalblue;
-  color: white;
-  border: none;
-  border-radius: 5px;
-  cursor: pointer;
-  font-weight: bold;
+// const BotaoAtualizar = styled.button`
+//   margin-bottom: 1rem;
+//   padding: 0.5rem 1rem;
+//   background-color: royalblue;
+//   color: white;
+//   border: none;
+//   border-radius: 5px;
+//   cursor: pointer;
+//   font-weight: bold;
   
-  &:hover {
-    background-color: darkblue;
-  }
-`
+//   &:hover {
+//     background-color: darkblue;
+//   }
+// `
 
-function App() {
-  const atualizarPagina = () => {
-    window.location.reload()
-  }
+// const Image = styled.img`
+//   width: 60px;
+//   height: 60px;
+//   border-radius: 50%;
+// `
 
-  return (
-    <Container>
-      <Titulo>Bem-vindo ao Painel de Empresas</Titulo>
-      <BotaoAtualizar onClick={atualizarPagina}>Atualizar Página</BotaoAtualizar>
-      <NovaEmpresa />
-      <EmpresasList />
-    </Container>
-  )
+// function App() {
+
+//   return (
+//     <>
+//       <GlobalStyle />
+//       <Container>
+//         <Header/>
+//         <NovaEmpresa />
+//         <EmpresasList />
+//       </Container>
+//     </>
+//   )
+// }
+
+// export default App
+
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import Login from './components/Login';
+import Dashboard from './pages/Dashboard';
+
+function PrivateRoute({ children }) {
+  const token = localStorage.getItem('token');
+  return token ? children : <Navigate to="/" />;
 }
 
-export default App
+function App() {
+  return (
+    <Router>
+      <Routes>
+        <Route path="/" element={<Login />} />
+        <Route path="/dashboard" element={
+          <PrivateRoute>
+            <Dashboard />
+          </PrivateRoute>
+        } />
+        {/* Adicione outras rotas protegidas aqui, dentro de <PrivateRoute> */}
+      </Routes>
+    </Router>
+  );
+}
 
-// O que já temos:
-// - Cadastro de empresa com geração de QR Code
-// - Reinício do bot para gerar novo QR Code
+export default App;
 
-// Agora precisamos:
-// Melhorar o fluxo entre humano e bot para responder
-// Desativar não está funcionando
-// Refinar o chatbot para responder de uma melhor maneira
-// Melhorar o front-end, adicionar mais estilos e responsividade
+// Rota de login está criada: Agora é conseguir registrar login e depois conseguir fazer a verificação para poder
+// entrar no painel da dash
