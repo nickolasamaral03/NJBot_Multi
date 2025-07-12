@@ -1,12 +1,31 @@
-# React + Vite
+Pontos Atuais do projeto:
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Vamos buscar forma de autenticar para poder entrar no projeto somente credenciados no momento ( podemos ir pensando como cliente podem entrar )
 
-Currently, two official plugins are available:
+    - NÃO VAMOS SE PREOCUPAR EM SUBIR O PROJETO AGORA
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+Vamos salvar as interações no banco de dados para podermos fazer algumas coisas:
+- Análise de relatório e desempenho e outras coisas
 
-## Expanding the ESLint configuration
+----
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+Criação de Fluxos Customizados (tipo ChatFuel / ManyChat)
+Criar fluxos de perguntas e respostas, com opções, ações e lógica condicional.
+
+Ex: "Deseja falar sobre Produto, Suporte ou Financeiro?" → ir para um bloco específico.
+
+----
+
+Agendamentos e Tarefas
+O bot pode oferecer agendamento de serviços ou retorno de ligação.
+
+Enviar lembretes automáticos via WhatsApp no horário agendado
+
+----
+
+modo de treinamento passivo da IA.
+
+----
+
+Envio de Campanhas Inteligentes no WhatsApp
+Enviar mensagens em massa personalizadas, usando IA para adaptar o tom com base no histórico.
