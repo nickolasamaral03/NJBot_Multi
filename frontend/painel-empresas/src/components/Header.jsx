@@ -18,6 +18,11 @@ const Header = styled.header`
   box-shadow: 0 2px 4px rgba(0,0,0,0.2);
   margin-top: -10px;
   border-radius: 10px; /* Ajuste para um valor menor e mais visível */
+
+  p{
+    margin-left: 20px;
+    font-size: 0.8rem;
+  }
 `
 
 const LogoSection = styled.div`
@@ -33,11 +38,6 @@ const LogoImg = styled.img`
   border-radius: 50%;
 `
 
-const Titulo = styled.h1`
-  font-size: 1.5rem;
-  font-weight: bold;
-`
-
 const Saudacao = styled.div`
   font-size: 1.2rem;
   font-weight: 500;
@@ -50,7 +50,8 @@ function DashboardHeader() {
     <Header>
       <LogoSection>
         <LogoImg src={logo} alt="Logo NJBot" />
-        <Titulo>NJBot</Titulo>
+        <p>SUPORTE TÉCNICO</p>
+        <p>WHATS FINANCIAL</p>
       </LogoSection>
       <Saudacao>Bem-vindo ao painel do NJBot</Saudacao>
     </Header>

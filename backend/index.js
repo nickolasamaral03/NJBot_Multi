@@ -9,9 +9,9 @@ const { gerarRespostaGemini } = require('./gemini');
 const { default: makeWASocket, DisconnectReason, useMultiFileAuthState } = require('@whiskeysockets/baileys');
 const { Boom } = require('@hapi/boom');
 const Empresa = require('./models/Empresa');
-const bcrypt = require('bcryptjs');
+// const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const Usuario = require('./models/Usuario');
+// const Usuario = require('./models/Usuario');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -134,6 +134,39 @@ sock.ev.on('messages.upsert', async (m) => {
   } catch (error) {
     console.error('❌ Erro ao processar mensagem:', error);
   }
+
+  const fluxo = await Fluxo.findOne({ empresa: dadosAtualizadosEmpresa._id });
+  if(fluxo){
+    if(!atendimentosManuais[chaveAtendimento]?.blocoAtual){ // se o cliente não iniciou o fluxo
+
+      const blocoInicial = fluxo.blocos.find(b => b.nome === 'inicial');
+      if(blocoInicial){
+        await sock.sendMessage(sender, { text: blocoInicial.mensagem }); //mensagem inicial do fluxo
+        atendimentosManuais[chaveAtendimento] = { // Salva o estado do cliente no blocoAtual
+          ...atendimentosManuais[chaveAtendimento],
+          blocoAtual: 'Inicio'
+        };
+        return
+      }
+    } else {
+      const blocoAtual = fluxo.blocos.find(b => b.nome === atendimentosManuais[chaveAtendimento].blocoAtual); // cliente já está no fluxo
+      
+      if(blocoAtual){
+        const opcao = blocoAtual.opcoes.find(o => textoLower.includes(o.texto.toLowerCase())); // verifica se o texto do usuário corresponde a alguma opção do bloco atual
+        if(opcao){
+          const proximoBloco = fluxo.blocos.find(b => b.nome === opcao.proximoBloco); //encontrou o bloco de destino
+          if(proximoBloco){
+            await sock.sendMessage(sender, {text: proximoBloco.mensagem });
+            atendimentosManuais[chaveAtendimento].blocoAtual = proximoBloco.nome;
+            return;
+          }
+        } else {
+          await sock.sendMessage(sender, { text: '🤖 Opção inválida. Por favor, escolha uma das opções disponíveis.' });
+          return;
+        }
+      }
+    }
+  }
 });
 
   bots[empresa.nome] = sock;
@@ -178,24 +211,25 @@ app.post('/api/registrar', async (req, res) => {
   }
 });
 
+const JWT_SECRET = process.env.JWT_SECRET || 'chavejwtsegura';
+
+const USUARIO_FIXO = {
+  email: 'admin@njbot.com',
+  senha: '123456', // deixe assim por enquanto
+  nome: 'Administrador'
+};
+
 app.post('/api/login', async (req, res) => {
   const { email, senha } = req.body;
 
-  try {
-    const usuario = await Usuario.findOne({ email });
-    if (!usuario) return res.status(401).json({ erro: 'Usuário não encontrado' });
-
-    const senhaValida = await bcrypt.compare(senha, usuario.senhaHash);
-    if (!senhaValida) return res.status(401).json({ erro: 'Senha inválida' });
-
-    const token = jwt.sign({ id: usuario._id }, process.env.JWT_SECRET, { expiresIn: '8h' });
-
-    res.json({ token, nome: usuario.nome, email: usuario.email });
-  } catch (err) {
-    res.status(500).json({ erro: 'Erro no login' });
+  if (email !== USUARIO_FIXO.email || senha !== USUARIO_FIXO.senha) {
+    return res.status(401).json({ erro: 'Email ou senha inválidos' });
   }
-});
 
+  const token = jwt.sign({ email: USUARIO_FIXO.email, nome: USUARIO_FIXO.nome }, JWT_SECRET, { expiresIn: '8h' });
+
+  res.json({ token, nome: USUARIO_FIXO.nome, email: USUARIO_FIXO.email });
+});
 
 app.post('/api/empresas', async (req, res) => {
   const { nome, promptIA, telefone, ativo } = req.body;
@@ -385,6 +419,30 @@ app.put('/api/empresas/:id/toggle-bot', async (req, res) => {
     res.status(500).json({ message: 'Erro ao alternar bot' });
   }
 });
+
+const Fluxo = require('./models/Fluxo');
+
+app.post('/api/empresas/:id/fluxo', async (req, res) => {
+  const { id } = req.params;
+  const { blocos } = req.body;
+
+  try{
+    let fluxo = await Fluxo.findOne({ empresa: id})
+
+    if(fluxo){
+      fluxo.blocos = blocos;
+    } else{
+      fluxo = new Fluxo({ empresa: id, blocos });
+    }
+
+    await fluxo.save();
+    res.json({ message: 'Fluxo atualizado com sucesso', fluxo });
+  } catch (err) {
+    console.error('Erro ao atualizar fluxo:', err);
+    res.status(500).json({ error: 'Erro ao atualizar fluxo' });
+  }
+
+})
 
 app.get('/', (req, res) => {
   res.send('🤖 API do NJBot está rodando!');
