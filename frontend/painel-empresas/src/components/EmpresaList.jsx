@@ -338,6 +338,32 @@ const ButtonGroup = styled.div`
   align-items: center;
 `
 
+const TextArea = styled.textarea`
+  width: 100%;
+  padding: 0.6rem 0.75rem;
+  margin: 0.35rem 0;
+  font-size: 1rem;
+  border: 1.5px solid #ccc;
+  border-radius: 6px;
+  resize: vertical;
+  min-height: 80px;
+  transition: border-color 0.3s ease;
+
+  &:focus {
+    outline: none;
+    border-color: #2a9df4;
+    background-color: #e8f0fe;
+  }
+`;
+
+
+const SetorContainer = styled.div`
+  background-color: #f0f4f9;
+  padding: 1rem;
+  border-radius: 8px;
+  margin-top: 0.75rem;
+`;
+
 const EmpresasList = () => {
   const [empresas, setEmpresas] = useState([]);
   const [qrCodes, setQrCodes] = useState({});
@@ -349,6 +375,7 @@ const EmpresasList = () => {
     promptIA: '',
     telefone: '',
     botAtivo: true,
+    setores: []
   });
 
   useEffect(() => {
@@ -360,9 +387,92 @@ const EmpresasList = () => {
         console.error('Erro ao buscar empresas:', err);
       }
     };
-
     fetchEmpresas();
   }, []);
+
+  const adicionarSetor = async (idEmpresa) => {
+  const novoSetor = { nome: '', prompt: '' };
+  try {
+    const res = await api.post(`/empresas/${idEmpresa}/setores`, novoSetor);
+    setEmpresas((prev) =>
+      prev.map((e) => (e._id === idEmpresa ? res.data : e))
+    );
+    iniciarEdicao(res.data); // atualiza edição com empresa atualizada
+  } catch (err) {
+    console.error('Erro ao adicionar setor:', err);
+    alert('Erro ao adicionar setor.');
+  }
+};
+
+const editarSetor = async (idEmpresa, index, novoSetor) => {
+  try {
+    const res = await api.put(`/empresas/${idEmpresa}/setores/${index}`, novoSetor);
+    setEmpresas((prev) =>
+      prev.map((e) => (e._id === idEmpresa ? res.data : e))
+    );
+  } catch (err) {
+    console.error('Erro ao editar setor:', err);
+    alert('Erro ao editar setor.');
+  }
+};
+
+const removerSetor = async (idEmpresa, index) => {
+  if (!window.confirm('Deseja realmente remover este setor?')) return;
+  try {
+    const res = await api.delete(`/empresas/${idEmpresa}/setores/${index}`);
+    setEmpresas((prev) =>
+      prev.map((e) => (e._id === idEmpresa ? res.data : e))
+    );
+    iniciarEdicao(res.data);
+  } catch (err) {
+    console.error('Erro ao remover setor:', err);
+    alert('Erro ao remover setor.');
+  }
+};
+
+  const iniciarEdicao = (empresa) => {
+    setEmpresaEditando(empresa._id);
+    setFormData({
+      nome: empresa.nome || '',
+      promptIA: empresa.promptIA || '',
+      telefone: empresa.telefone || '',
+      botAtivo: empresa.botAtivo ?? true,
+      setores: empresa.setores || []
+    });
+  };
+
+  const salvarEdicao = async (idEmpresa) => {
+    try {
+      const res = await api.put(`/empresas/${idEmpresa}`, formData);
+      setEmpresas((prev) =>
+        prev.map((e) => (e._id === idEmpresa ? res.data : e))
+      );
+      cancelarEdicao();
+    } catch (err) {
+      console.error('Erro ao editar empresa:', err);
+      alert('Erro ao editar empresa.');
+    }
+  };
+
+  const cancelarEdicao = () => {
+    setEmpresaEditando(null);
+    setFormData({ nome: '', promptIA: '', telefone: '', botAtivo: true, setores: [] });
+  };
+
+  // const adicionarSetor = () => {
+  //   setFormData({ ...formData, setores: [...formData.setores, { nome: '', prompt: '' }] });
+  // };
+
+  // const removerSetor = (index) => {
+  //   const novos = [...formData.setores];
+  //   novos.splice(index, 1);
+  //   setFormData({ ...formData, setores: novos });
+  // };
+
+  const empresasFiltradas = empresas.filter((empresa) =>
+    empresa.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    empresa.telefone.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   const gerarNovoQrCode = async (idEmpresa, nomeEmpresa) => {
     try {
@@ -384,16 +494,15 @@ const EmpresasList = () => {
     const empresa = empresas.find(e => e._id === idEmpresa);
     if (!empresa) return;
 
-    if (!window.confirm(`Tem certeza que deseja excluir a empresa "${empresa.nome}"?`)) return;
+    if (!window.confirm(`Deseja excluir a empresa "${empresa.nome}"?`)) return;
 
     try {
       await api.delete(`/empresas/${idEmpresa}`);
       setEmpresas((prev) => prev.filter((empresa) => empresa._id !== idEmpresa));
-
       setQrCodes((prev) => {
-        const newQrCodes = {...prev};
-        delete newQrCodes[empresa.nome];
-        return newQrCodes;
+        const novos = { ...prev };
+        delete novos[empresa.nome];
+        return novos;
       });
     } catch (err) {
       console.error('Erro ao excluir empresa:', err);
@@ -414,39 +523,6 @@ const EmpresasList = () => {
       alert('Erro ao alternar status do bot.');
     }
   };
-
-  const iniciarEdicao = (empresa) => {
-    setEmpresaEditando(empresa._id);
-    setFormData({
-      nome: empresa.nome || '',
-      promptIA: empresa.promptIA || '',
-      telefone: empresa.telefone || '',
-      botAtivo: empresa.botAtivo ?? true
-    });
-  };
-
-  const cancelarEdicao = () => {
-    setEmpresaEditando(null);
-    setFormData({ nome: '', promptIA: '', telefone: '', botAtivo: true });
-  };
-
-  const salvarEdicao = async (idEmpresa) => {
-    try {
-      const res = await api.put(`/empresas/${idEmpresa}`, formData);
-      setEmpresas((prev) =>
-        prev.map((e) => (e._id === idEmpresa ? res.data : e))
-      );
-      cancelarEdicao();
-    } catch (err) {
-      console.error('Erro ao editar empresa:', err);
-      alert('Erro ao editar empresa.');
-    }
-  };
-
-  const empresasFiltradas = empresas.filter((empresa) =>
-    empresa.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    empresa.telefone.toLowerCase().includes(searchTerm.toLowerCase())
-  );
 
   return (
     <Container>
@@ -472,16 +548,54 @@ const EmpresasList = () => {
                 />
                 <Input
                   type="text"
-                  placeholder="Prompt IA"
-                  value={formData.promptIA}
-                  onChange={(e) => setFormData({ ...formData, promptIA: e.target.value })}
-                />
-                <Input
-                  type="text"
                   placeholder="Telefone"
                   value={formData.telefone}
                   onChange={(e) => setFormData({ ...formData, telefone: e.target.value })}
                 />
+
+                {formData.setores.length > 0 ? (
+                  <>
+                    {formData.setores.map((setor, index) => (
+                      <SetorContainer key={index}>
+                        <Input
+                          type="text"
+                          placeholder={`Nome do setor ${index + 1}`}
+                          value={setor.nome}
+                          onChange={(e) => {
+                            const novos = [...formData.setores];
+                            novos[index].nome = e.target.value;
+                            setFormData({ ...formData, setores: novos });
+                          }}
+                          onBlur={() => editarSetor(empresa._id, index, formData.setores[index])}
+                        />
+
+                        <TextArea
+                          placeholder={`Prompt do setor ${index + 1}`}
+                          value={setor.prompt}
+                          onChange={(e) => {
+                            const novos = [...formData.setores];
+                            novos[index].prompt = e.target.value;
+                            setFormData({ ...formData, setores: novos });
+                          }}
+                          onBlur={() => editarSetor(empresa._id, index, formData.setores[index])}
+                        />
+                        <ButtonDanger onClick={() => removerSetor(empresa._id, index)}>Remover setor</ButtonDanger>
+
+                      </SetorContainer>
+                    ))}
+                    <ButtonPrimary onClick={() => adicionarSetor(empresa._id)}>Adicionar setor</ButtonPrimary>
+                  </>
+                ) : (
+                  <>
+                    <TextArea
+                      placeholder="Prompt geral da IA"
+                      value={formData.promptIA}
+                      onChange={(e) => setFormData({ ...formData, promptIA: e.target.value })}
+                    />
+                    <ButtonSecondary onClick={adicionarSetor}>Deseja usar setores?</ButtonSecondary>
+                  </>
+                )}
+
                 <Label>
                   <input
                     type="checkbox"
@@ -497,8 +611,18 @@ const EmpresasList = () => {
             ) : (
               <div>
                 <Strong>{empresa.nome}</Strong>
-                <Paragraph>Prompt IA: {empresa.promptIA}</Paragraph>
                 <Paragraph>Telefone: {empresa.telefone}</Paragraph>
+                {empresa.setores && empresa.setores.length > 0 ? (
+                  <>
+                    <Paragraph><strong>Setores:</strong></Paragraph>
+                    {empresa.setores.map((setor, i) => (
+                      <Paragraph key={i}>• {setor.nome}</Paragraph>
+                    ))}
+                  </>
+                ) : (
+                  <Paragraph>Prompt IA: {empresa.promptIA}</Paragraph>
+                )}
+
                 <Label>
                   <input
                     type="checkbox"
@@ -533,9 +657,6 @@ const EmpresasList = () => {
       </List>
     </Container>
   );
-
-  
-
 };
 
 export default EmpresasList;
