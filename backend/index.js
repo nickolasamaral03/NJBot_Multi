@@ -469,20 +469,118 @@ app.post('/api/empresas/:id/fluxo', async (req, res) => {
 
 })
 
+// app.post('/api/empresas/:id/setores', async (req, res) => {
+//   const { id } = req.params;
+//   const { nome, prompt } = req.body;
+  
+//   console.log('[POST] Adicionar setor para empresa:', id);
+//   console.log('Dados recebidos:', { nome, prompt });
+
+//   try {
+//     const empresa = await Empresa.findById(id);
+//     if (!empresa) return res.status(404).send('Empresa não encontrada');
+
+//     empresa.setores.push({ nome, prompt });
+//     await empresa.save();
+
+//     res.json(empresa);
+//   } catch (err) {
+//     res.status(500).send('Erro ao adicionar setor', err);
+//   }
+// });
+
+// app.post('/api/empresas/:id/setores', async (req, res) => {
+//   const { id } = req.params;
+//   const { nome, prompt } = req.body;
+  
+//   console.log('[POST] Adicionar setor para empresa:', id);
+//   console.log('Dados recebidos:', { nome, prompt });
+
+//   try {
+//     if (!mongoose.Types.ObjectId.isValid(id)) {
+//       return res.status(400).json({ error: 'ID inválido' });
+//     }
+
+//     const empresa = await Empresa.findById(id);
+//     if (!empresa) return res.status(404).json({ error: 'Empresa não encontrada' });
+
+//     if (!nome || !prompt) {
+//       return res.status(400).json({ error: 'Nome e prompt são obrigatórios' });
+//     }
+
+//     empresa.setores.push({ nome, prompt });
+//     await empresa.save();
+
+//     res.json(empresa);
+//   } catch (err) {
+//     console.error('Erro ao adicionar setor:', err);
+//     res.status(500).json({ error: 'Erro ao adicionar setor', details: err.message });
+//   }
+// });
+
+// app.put('/api/empresas/:id/setores/:index', async (req, res) => {
+//   const { id, index } = req.params;
+//   const { nome, prompt } = req.body;
+
+//   try {
+//     const empresa = await Empresa.findById(id);
+//     if (!empresa) return res.status(404).send('Empresa não encontrada');
+
+//     if (!empresa.setores[index]) return res.status(404).send('Setor não encontrado');
+
+//     empresa.setores[index] = { nome, prompt };
+//     await empresa.save();
+
+//     res.json(empresa);
+//   } catch (err) {
+//     res.status(500).send('Erro ao editar setor');
+//   }
+// });
+
+// app.delete('/api/empresas/:id/setores/:index', async (req, res) => {
+//   const { id, index } = req.params;
+
+//   try {
+//     const empresa = await Empresa.findById(id);
+//     if (!empresa) return res.status(404).send('Empresa não encontrada');
+
+//     if (!empresa.setores[index]) return res.status(404).send('Setor não encontrado');
+
+//     empresa.setores.splice(index, 1);
+//     await empresa.save();
+
+//     res.json(empresa);
+//   } catch (err) {
+//     res.status(500).send('Erro ao remover setor');
+//   }
+// });
+
 app.post('/api/empresas/:id/setores', async (req, res) => {
   const { id } = req.params;
   const { nome, prompt } = req.body;
-
+  
   try {
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ error: 'ID inválido' });
+    }
+
     const empresa = await Empresa.findById(id);
-    if (!empresa) return res.status(404).send('Empresa não encontrada');
+    if (!empresa) return res.status(404).json({ error: 'Empresa não encontrada' });
+
+    if (!nome || !prompt) {
+      return res.status(400).json({ error: 'Nome e prompt são obrigatórios' });
+    }
 
     empresa.setores.push({ nome, prompt });
-    await empresa.save();
+    const empresaAtualizada = await empresa.save();
 
-    res.json(empresa);
+    res.json(empresaAtualizada);
   } catch (err) {
-    res.status(500).send('Erro ao adicionar setor');
+    console.error('Erro ao adicionar setor:', err);
+    res.status(500).json({ 
+      error: 'Erro ao adicionar setor',
+      details: err.message 
+    });
   }
 });
 
@@ -491,17 +589,32 @@ app.put('/api/empresas/:id/setores/:index', async (req, res) => {
   const { nome, prompt } = req.body;
 
   try {
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ error: 'ID inválido' });
+    }
+
     const empresa = await Empresa.findById(id);
-    if (!empresa) return res.status(404).send('Empresa não encontrada');
+    if (!empresa) return res.status(404).json({ error: 'Empresa não encontrada' });
 
-    if (!empresa.setores[index]) return res.status(404).send('Setor não encontrado');
+    const idx = parseInt(index);
+    if (isNaN(idx) || idx < 0 || idx >= empresa.setores.length) {
+      return res.status(400).json({ error: 'Índice do setor inválido' });
+    }
 
-    empresa.setores[index] = { nome, prompt };
-    await empresa.save();
+    if (!nome || !prompt) {
+      return res.status(400).json({ error: 'Nome e prompt são obrigatórios' });
+    }
 
-    res.json(empresa);
+    empresa.setores[idx] = { nome, prompt };
+    const empresaAtualizada = await empresa.save();
+
+    res.json(empresaAtualizada);
   } catch (err) {
-    res.status(500).send('Erro ao editar setor');
+    console.error('Erro ao editar setor:', err);
+    res.status(500).json({ 
+      error: 'Erro ao editar setor',
+      details: err.message 
+    });
   }
 });
 
@@ -509,20 +622,30 @@ app.delete('/api/empresas/:id/setores/:index', async (req, res) => {
   const { id, index } = req.params;
 
   try {
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ error: 'ID inválido' });
+    }
+
     const empresa = await Empresa.findById(id);
-    if (!empresa) return res.status(404).send('Empresa não encontrada');
+    if (!empresa) return res.status(404).json({ error: 'Empresa não encontrada' });
 
-    if (!empresa.setores[index]) return res.status(404).send('Setor não encontrado');
+    const idx = parseInt(index);
+    if (isNaN(idx) || idx < 0 || idx >= empresa.setores.length) {
+      return res.status(400).json({ error: 'Índice do setor inválido' });
+    }
 
-    empresa.setores.splice(index, 1);
-    await empresa.save();
+    empresa.setores.splice(idx, 1);
+    const empresaAtualizada = await empresa.save();
 
-    res.json(empresa);
+    res.json(empresaAtualizada);
   } catch (err) {
-    res.status(500).send('Erro ao remover setor');
+    console.error('Erro ao remover setor:', err);
+    res.status(500).json({ 
+      error: 'Erro ao remover setor',
+      details: err.message 
+    });
   }
 });
-
 
 app.get('/', (req, res) => {
   res.send('🤖 API do NJBot está rodando!');

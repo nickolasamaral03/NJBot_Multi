@@ -391,44 +391,60 @@ const EmpresasList = () => {
   }, []);
 
   const adicionarSetor = async (idEmpresa) => {
-  const novoSetor = { nome: '', prompt: '' };
-  try {
-    const res = await api.post(`/empresas/${idEmpresa}/setores`, novoSetor);
-    setEmpresas((prev) =>
-      prev.map((e) => (e._id === idEmpresa ? res.data : e))
-    );
-    iniciarEdicao(res.data); // atualiza edição com empresa atualizada
-  } catch (err) {
-    console.error('Erro ao adicionar setor:', err);
-    alert('Erro ao adicionar setor.');
-  }
-};
+    const novoSetor = { 
+      nome: `Novo Setor ${Math.floor(Math.random() * 1000)}`,
+      prompt: 'Descreva aqui o propósito deste setor'
+    };
+    
+    try {
+      const res = await api.post(`/empresas/${idEmpresa}/setores`, novoSetor);
+      setEmpresas((prev) =>
+        prev.map((e) => (e._id === idEmpresa ? res.data : e))
+      );
+      iniciarEdicao(res.data);
+    } catch (err) {
+      console.error('Erro ao adicionar setor:', err);
+      alert('Erro ao adicionar setor. Verifique o console para mais detalhes.');
+    }
+  };
 
-const editarSetor = async (idEmpresa, index, novoSetor) => {
-  try {
-    const res = await api.put(`/empresas/${idEmpresa}/setores/${index}`, novoSetor);
-    setEmpresas((prev) =>
-      prev.map((e) => (e._id === idEmpresa ? res.data : e))
-    );
-  } catch (err) {
-    console.error('Erro ao editar setor:', err);
-    alert('Erro ao editar setor.');
-  }
-};
+  const editarSetor = debounce(async (idEmpresa, index, novoSetor) => {
+    try {
+      setEditandoSetor({ id: idEmpresa, index });
+      
+      const empresa = empresas.find(e => e._id === idEmpresa);
+      if (!empresa || !empresa.setores[index]) return;
+      
+      const setorAtual = empresa.setores[index];
+      if (setorAtual.nome === novoSetor.nome && setorAtual.prompt === novoSetor.prompt) {
+        return;
+      }
 
-const removerSetor = async (idEmpresa, index) => {
-  if (!window.confirm('Deseja realmente remover este setor?')) return;
-  try {
-    const res = await api.delete(`/empresas/${idEmpresa}/setores/${index}`);
-    setEmpresas((prev) =>
-      prev.map((e) => (e._id === idEmpresa ? res.data : e))
-    );
-    iniciarEdicao(res.data);
-  } catch (err) {
-    console.error('Erro ao remover setor:', err);
-    alert('Erro ao remover setor.');
-  }
-};
+      const res = await api.put(`/empresas/${idEmpresa}/setores/${index}`, novoSetor);
+      setEmpresas((prev) =>
+        prev.map((e) => (e._id === idEmpresa ? res.data : e))
+      );
+    } catch (err) {
+      console.error('Erro ao editar setor:', err);
+      alert('Erro ao editar setor. Verifique o console para mais detalhes.');
+    } finally {
+      setEditandoSetor({ id: null, index: null });
+    }
+  }, 500);
+
+  const removerSetor = async (idEmpresa, index) => {
+    if (!window.confirm('Deseja realmente remover este setor?')) return;
+    try {
+      const res = await api.delete(`/empresas/${idEmpresa}/setores/${index}`);
+      setEmpresas((prev) =>
+        prev.map((e) => (e._id === idEmpresa ? res.data : e))
+      );
+      iniciarEdicao(res.data);
+    } catch (err) {
+      console.error('Erro ao remover setor:', err);
+      alert('Erro ao remover setor.');
+    }
+  };
 
   const iniciarEdicao = (empresa) => {
     setEmpresaEditando(empresa._id);
@@ -437,9 +453,20 @@ const removerSetor = async (idEmpresa, index) => {
       promptIA: empresa.promptIA || '',
       telefone: empresa.telefone || '',
       botAtivo: empresa.botAtivo ?? true,
-      setores: empresa.setores || []
+      setores: empresa.setores ? [...empresa.setores] : []
     });
   };
+
+  // const iniciarEdicao = (empresa) => {
+  //   setEmpresaEditando(empresa._id);
+  //   setFormData({
+  //     nome: empresa.nome || '',
+  //     promptIA: empresa.promptIA || '',
+  //     telefone: empresa.telefone || '',
+  //     botAtivo: empresa.botAtivo ?? true,
+  //     setores: empresa.setores || []
+  //   });
+  // };
 
   const salvarEdicao = async (idEmpresa) => {
     try {
@@ -557,6 +584,7 @@ const removerSetor = async (idEmpresa, index) => {
                   <>
                     {formData.setores.map((setor, index) => (
                       <SetorContainer key={index}>
+                        {/* Nos inputs dos setores: */}
                         <Input
                           type="text"
                           placeholder={`Nome do setor ${index + 1}`}
@@ -579,11 +607,8 @@ const removerSetor = async (idEmpresa, index) => {
                           }}
                           onBlur={() => editarSetor(empresa._id, index, formData.setores[index])}
                         />
-                        <ButtonDanger onClick={() => removerSetor(empresa._id, index)}>Remover setor</ButtonDanger>
-
                       </SetorContainer>
                     ))}
-                    <ButtonPrimary onClick={() => adicionarSetor(empresa._id)}>Adicionar setor</ButtonPrimary>
                   </>
                 ) : (
                   <>
