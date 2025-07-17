@@ -268,9 +268,20 @@ const removerSetor = async (idEmpresa, index) => {
       promptIA: empresa.promptIA || '',
       telefone: empresa.telefone || '',
       botAtivo: empresa.botAtivo ?? true,
-      setores: empresa.setores || []
+      setores: empresa.setores ? [...empresa.setores] : []
     });
   };
+
+  // const iniciarEdicao = (empresa) => {
+  //   setEmpresaEditando(empresa._id);
+  //   setFormData({
+  //     nome: empresa.nome || '',
+  //     promptIA: empresa.promptIA || '',
+  //     telefone: empresa.telefone || '',
+  //     botAtivo: empresa.botAtivo ?? true,
+  //     setores: empresa.setores || []
+  //   });
+  // };
 
   const salvarEdicao = async (idEmpresa) => {
     try {
@@ -379,6 +390,7 @@ const removerSetor = async (idEmpresa, index) => {
                   <>
                     {formData.setores.map((setor, index) => (
                       <SetorContainer key={index}>
+                        {/* Nos inputs dos setores: */}
                         <Input
                           type="text"
                           placeholder={`Nome do setor ${index + 1}`}
@@ -409,7 +421,6 @@ const removerSetor = async (idEmpresa, index) => {
 
                       </SetorContainer>
                     ))}
-                    <ButtonPrimary onClick={() => adicionarSetor(empresa._id)}>Adicionar setor</ButtonPrimary>
                   </>
                 ) : (
                   <>
