@@ -11,7 +11,7 @@ const { Boom } = require('@hapi/boom');
 const Empresa = require('./models/Empresa');
 // const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const Fluxo = require('./models/fluxo');
+const Fluxo = require('./models/Fluxo');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -447,41 +447,37 @@ app.put('/api/empresas/:id/toggle-bot', async (req, res) => {
 
 
 
-app.post('/api/empresas/:id/fluxo', async (req, res) => {
-  const { id } = req.params;
-  const { blocos } = req.body;
+app.post('/api/fluxos', async (req, res) => {
+  const { empresaId, blocos } = req.body;
 
-  try{
-    let fluxo = await Fluxo.findOne({ empresa: id})
+  try {
+    const novoFluxo = new Fluxo({
+      empresa: empresaId,
+      blocos
+    });
 
-    if(fluxo){
-      fluxo.blocos = blocos;
-    } else{
-      fluxo = new Fluxo({ empresa: id, blocos });
-    }
-
-    await fluxo.save();
-    res.json({ message: 'Fluxo atualizado com sucesso', fluxo });
+    await novoFluxo.save();
+    res.status(201).json(novoFluxo);
   } catch (err) {
-    console.error('Erro ao atualizar fluxo:', err);
-    res.status(500).json({ error: 'Erro ao atualizar fluxo' });
+    console.error(err);
+    res.status(500).json({ erro: 'Erro ao salvar fluxo' });
   }
-
-})
+});
 
 app.post('/api/empresas/:id/setores', async (req, res) => {
   const { id } = req.params;
-  const { nome, prompt } = req.body;
+  const { nome, prompt } = req.body; // prompt vindo do front
 
   try {
     const empresa = await Empresa.findById(id);
     if (!empresa) return res.status(404).send('Empresa não encontrada');
 
-    empresa.setores.push({ nome, prompt });
+    empresa.setores.push({ nome, descricao: prompt }); // ✅ corrigido aqui
     await empresa.save();
 
     res.json(empresa);
   } catch (err) {
+    console.error('Erro ao adicionar setor:', err); // 🔍 veja o erro real
     res.status(500).send('Erro ao adicionar setor');
   }
 });
@@ -496,7 +492,11 @@ app.put('/api/empresas/:id/setores/:index', async (req, res) => {
 
     if (!empresa.setores[index]) return res.status(404).send('Setor não encontrado');
 
-    empresa.setores[index] = { nome, prompt };
+    empresa.setores[index] = { 
+       ...empresa.setores[index],
+      nome, 
+      prompt };
+
     await empresa.save();
 
     res.json(empresa);
