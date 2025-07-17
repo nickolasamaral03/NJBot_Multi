@@ -12,6 +12,7 @@ const Empresa = require('./models/Empresa');
 // const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const Fluxo = require('./models/Fluxo');
+const { handleMensagem } = require('./handlers/chatbot');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -68,8 +69,176 @@ async function iniciarBot(empresa) {
     }
   });
 
-  sock.ev.on('messages.upsert', async (m) => {
+//   sock.ev.on('messages.upsert', async (m) => {
+//   const saudacoes = ['oi', 'olá', 'ola', 'bom dia', 'boa tarde', 'boa noite'];
+
+
+// // No início do arquivo:
+// // const { handleMensagem } = require('./handlers/chatbot');
+
+// // // Dentro do handler de mensagens do WhatsApp:
+// // sock.ev.on('messages.upsert', async (m) => {
+// //   try {
+// //     const msg = m.messages[0];
+// //     if (!msg.message) return;
+
+// //     // ... (código existente para identificar empresa e setor)
+
+// //     const resposta = await handleMensagem(
+// //       empresaDB._id, 
+// //       setorEscolhido.nome, 
+// //       texto
+// //     );
+
+// //     await sock.sendMessage(sender, { text: resposta.resposta });
+
+// //     if (resposta.proximoSetor) {
+// //       // Lógica para continuar no próximo setor
+// //     }
+// //   } catch (err) {
+// //     console.error('Erro no handler:', err);
+// //   }
+// // });
+
+//   try {
+//     const msg = m.messages[0];
+//     if (!msg.message) return;
+
+//     const sender = msg.key.remoteJid;
+//     const texto = msg.message.conversation || msg.message.extendedTextMessage?.text || '';
+//     const textoLower = texto.toLowerCase().trim();
+//     const idEmpresa = empresa.nome;
+//     const chaveAtendimento = `${idEmpresa}_${sender}`;
+//     const comandoAtivarHumano = 'atendente';
+
+//     const empresaDB = await Empresa.findOne({ nome: idEmpresa });
+//     if (!empresaDB?.botAtivo) return; // <- AQUI ESTÁ A VERIFICAÇÃO CRUCIAL
+
+//     const setores = empresaDB?.setores || [];
+
+
+//     // === INÍCIO DO ATENDIMENTO COM SAUDAÇÃO ===
+//     if (saudacoes.includes(textoLower) && !atendimentosManuais[chaveAtendimento]?.etapa) {
+//       if (setores.length === 0) {
+//         await sock.sendMessage(sender, { text: 'Nenhum setor foi configurado para esta empresa. Por favor, entre em contato com o suporte.' });
+//         return;
+//       }
+//       // Garante que o objeto existe antes de setar etapa
+//       if (!atendimentosManuais[chaveAtendimento]) {
+//         atendimentosManuais[chaveAtendimento] = {};
+//       }
+//       let mensagemSetores = 'Olá! Para te ajudar melhor, escolha um setor:\n\n';
+//       setores.forEach((setor, index) => {
+//         mensagemSetores += `${index + 1}️⃣ ${setor.nome}\n`;
+//       });
+//       atendimentosManuais[chaveAtendimento].etapa = 'setor';
+//       delete atendimentosManuais[chaveAtendimento].tentativaInvalidaSetor;
+//       await sock.sendMessage(sender, { text: mensagemSetores });
+//       return;
+//     }
+
+
+//     if (atendimentosManuais[chaveAtendimento]?.etapa === 'setor') {
+//   // Se o texto não for apenas um número, ignore e aguarde nova tentativa
+//     if (!/^\d+$/.test(textoLower)) return;
+
+//     const indexEscolhido = parseInt(textoLower);
+//     if (indexEscolhido >= 1 && indexEscolhido <= setores.length) {
+
+//         const setorEscolhido = setores[indexEscolhido - 1];
+//         atendimentosManuais[chaveAtendimento].etapa = 'atendimento';
+//         delete atendimentosManuais[chaveAtendimento].tentativaInvalidaSetor;
+//         await sock.sendMessage(sender, { text: `Você escolheu o setor *${setorEscolhido.nome}*. Como posso te ajudar?` });
+//         return;
+//       } else {
+//         if (atendimentosManuais[chaveAtendimento].tentativaInvalidaSetor) {
+//           let mensagemSetores = '⚠️ Opção inválida. Por favor, selecione um dos setores disponíveis:\n\n';
+//           setores.forEach((setor, index) => {
+//             mensagemSetores += `${index + 1}️⃣ ${setor.nome}\n`;
+//           });
+//           await sock.sendMessage(sender, { text: mensagemSetores });
+//         }
+//         atendimentosManuais[chaveAtendimento].tentativaInvalidaSetor = true;
+//         return;
+//       }
+//     }
+
+//     // === COMANDOS ESPECIAIS ===
+//     if (['#bot', 'bot', 'voltar ao bot'].includes(textoLower)) {
+//       atendimentosManuais[chaveAtendimento] = { ativo: false, ultimoContato: null };
+//       await sock.sendMessage(sender, { text: '🤖 Atendimento automático reativado.' });
+//       return;
+//     }
+
+//     if (msg.key.fromMe === true) {
+//       if (atendimentosManuais[chaveAtendimento]?.ativo) {
+//         atendimentosManuais[chaveAtendimento].ultimoContato = new Date();
+//       }
+//       return;
+//     }
+
+//     if (textoLower.includes(comandoAtivarHumano)) {
+//       atendimentosManuais[chaveAtendimento] = { ativo: true, ultimoContato: new Date() };
+//       await sock.sendMessage(sender, { text: '👤 Atendimento humano ativado. Por favor, aguarde o atendente.' });
+//       return;
+//     }
+
+//     if (atendimentosManuais[chaveAtendimento]?.ativo) {
+//       atendimentosManuais[chaveAtendimento].ultimoContato = new Date();
+//       return;
+//     }
+
+
+//   if (atendimentosManuais[chaveAtendimento]?.etapa !== 'atendimento') {
+//     return; // Só processa fluxo e IA se já escolheu setor
+//   }
+
+//   // Buscar fluxo do banco
+//   const fluxo = await Fluxo.findOne({ empresa: empresaDB._id });
+
+//   if (fluxo) {
+//     // Se já tem blocoAtual, processa opções
+//     if (atendimentosManuais[chaveAtendimento]?.blocoAtual) {
+//       const blocoAtual = fluxo.blocos.find(b => b.nome === atendimentosManuais[chaveAtendimento].blocoAtual);
+//       if (blocoAtual) {
+//         const opcao = blocoAtual.opcoes.find(o => textoLower.includes(o.texto.toLowerCase()));
+//         if (opcao) {
+//           const proximoBloco = fluxo.blocos.find(b => b.nome === opcao.proximoBloco);
+//           if (proximoBloco) {
+//             await sock.sendMessage(sender, { text: proximoBloco.mensagem });
+//             atendimentosManuais[chaveAtendimento].blocoAtual = proximoBloco.nome;
+//             return;
+//           }
+//         } else {
+//           await sock.sendMessage(sender, { text: '🤖 Opção inválida. Por favor, escolha uma das opções do menu.' });
+//           return;
+//         }
+//       }
+//     } else {
+//       // Se não tem blocoAtual, inicia pelo bloco inicial
+//       const blocoInicial = fluxo.blocos.find(b => b.nome === 'inicial');
+//       if (blocoInicial) {
+//         await sock.sendMessage(sender, { text: blocoInicial.mensagem });
+//         atendimentosManuais[chaveAtendimento].blocoAtual = 'inicial';
+//         return;
+//       }
+//     }
+//   }
+
+//     await sock.sendPresenceUpdate('composing', sender);
+//     await new Promise(resolve => setTimeout(resolve, 3000));
+
+//     const respostaIA = await chamarIA(empresa.promptIA, texto);
+//     await sock.sendMessage(sender, { text: respostaIA });
+//   } catch (error) {
+//     console.error('❌ Erro ao processar mensagem:', error);
+//   }
+// });
+
+sock.ev.on('messages.upsert', async (m) => {
   const saudacoes = ['oi', 'olá', 'ola', 'bom dia', 'boa tarde', 'boa noite'];
+  const comandosEspeciais = ['#sair', '#bot', 'atendente'];
+  
   try {
     const msg = m.messages[0];
     if (!msg.message) return;
@@ -77,131 +246,138 @@ async function iniciarBot(empresa) {
     const sender = msg.key.remoteJid;
     const texto = msg.message.conversation || msg.message.extendedTextMessage?.text || '';
     const textoLower = texto.toLowerCase().trim();
-    const idEmpresa = empresa.nome;
+    const idEmpresa = msg.key.remoteJid.split('@')[0]; // Adapte conforme necessário
     const chaveAtendimento = `${idEmpresa}_${sender}`;
-    const comandoAtivarHumano = 'atendente';
 
-    const empresaDB = await Empresa.findOne({ nome: idEmpresa });
-    if (!empresaDB?.botAtivo) return; // <- AQUI ESTÁ A VERIFICAÇÃO CRUCIAL
+    // Obter instância da empresa
+    const empresaDB = await Empresa.findById(idEmpresa);
+    if (!empresaDB?.botAtivo) return;
 
-    const setores = empresaDB?.setores || [];
-
-
-    // === INÍCIO DO ATENDIMENTO COM SAUDAÇÃO ===
-    if (saudacoes.includes(textoLower) && !atendimentosManuais[chaveAtendimento]?.etapa) {
-      if (setores.length === 0) {
-        await sock.sendMessage(sender, { text: 'Nenhum setor foi configurado para esta empresa. Por favor, entre em contato com o suporte.' });
+    // Verificar comandos especiais
+    if (comandosEspeciais.includes(textoLower)) {
+      if (textoLower === '#sair') {
+        delete atendimentosManuais[chaveAtendimento];
+        await sock.sendMessage(sender, { text: 'Conversa reiniciada. Digite "oi" para começar.' });
         return;
       }
-      // Garante que o objeto existe antes de setar etapa
-      if (!atendimentosManuais[chaveAtendimento]) {
-        atendimentosManuais[chaveAtendimento] = {};
-      }
-      let mensagemSetores = 'Olá! Para te ajudar melhor, escolha um setor:\n\n';
-      setores.forEach((setor, index) => {
-        mensagemSetores += `${index + 1}️⃣ ${setor.nome}\n`;
-      });
-      atendimentosManuais[chaveAtendimento].etapa = 'setor';
-      delete atendimentosManuais[chaveAtendimento].tentativaInvalidaSetor;
-      await sock.sendMessage(sender, { text: mensagemSetores });
-      return;
-    }
-
-
-    if (atendimentosManuais[chaveAtendimento]?.etapa === 'setor') {
-  // Se o texto não for apenas um número, ignore e aguarde nova tentativa
-    if (!/^\d+$/.test(textoLower)) return;
-
-    const indexEscolhido = parseInt(textoLower);
-    if (indexEscolhido >= 1 && indexEscolhido <= setores.length) {
-
-        const setorEscolhido = setores[indexEscolhido - 1];
-        atendimentosManuais[chaveAtendimento].etapa = 'atendimento';
-        delete atendimentosManuais[chaveAtendimento].tentativaInvalidaSetor;
-        await sock.sendMessage(sender, { text: `Você escolheu o setor *${setorEscolhido.nome}*. Como posso te ajudar?` });
+      if (textoLower === '#bot') {
+        atendimentosManuais[chaveAtendimento] = { ativo: false };
+        await sock.sendMessage(sender, { text: 'Modo automático ativado.' });
         return;
-      } else {
-        if (atendimentosManuais[chaveAtendimento].tentativaInvalidaSetor) {
-          let mensagemSetores = '⚠️ Opção inválida. Por favor, selecione um dos setores disponíveis:\n\n';
-          setores.forEach((setor, index) => {
-            mensagemSetores += `${index + 1}️⃣ ${setor.nome}\n`;
-          });
-          await sock.sendMessage(sender, { text: mensagemSetores });
-        }
-        atendimentosManuais[chaveAtendimento].tentativaInvalidaSetor = true;
+      }
+      if (textoLower.includes('atendente')) {
+        atendimentosManuais[chaveAtendimento] = { ativo: true, ultimoContato: new Date() };
+        await sock.sendMessage(sender, { text: 'Solicitação enviada ao atendente humano.' });
         return;
       }
     }
 
-    // === COMANDOS ESPECIAIS ===
-    if (['#bot', 'bot', 'voltar ao bot'].includes(textoLower)) {
-      atendimentosManuais[chaveAtendimento] = { ativo: false, ultimoContato: null };
-      await sock.sendMessage(sender, { text: '🤖 Atendimento automático reativado.' });
-      return;
-    }
-
-    if (msg.key.fromMe === true) {
-      if (atendimentosManuais[chaveAtendimento]?.ativo) {
-        atendimentosManuais[chaveAtendimento].ultimoContato = new Date();
-      }
-      return;
-    }
-
-    if (textoLower.includes(comandoAtivarHumano)) {
-      atendimentosManuais[chaveAtendimento] = { ativo: true, ultimoContato: new Date() };
-      await sock.sendMessage(sender, { text: '👤 Atendimento humano ativado. Por favor, aguarde o atendente.' });
-      return;
-    }
-
+    // Se em atendimento manual
     if (atendimentosManuais[chaveAtendimento]?.ativo) {
       atendimentosManuais[chaveAtendimento].ultimoContato = new Date();
       return;
     }
 
-
-  if (atendimentosManuais[chaveAtendimento]?.etapa !== 'atendimento') {
-    return; // Só processa fluxo e IA se já escolheu setor
-  }
-
-  // Buscar fluxo do banco
-  const fluxo = await Fluxo.findOne({ empresa: empresaDB._id });
-
-  if (fluxo) {
-    // Se já tem blocoAtual, processa opções
-    if (atendimentosManuais[chaveAtendimento]?.blocoAtual) {
-      const blocoAtual = fluxo.blocos.find(b => b.nome === atendimentosManuais[chaveAtendimento].blocoAtual);
-      if (blocoAtual) {
-        const opcao = blocoAtual.opcoes.find(o => textoLower.includes(o.texto.toLowerCase()));
-        if (opcao) {
-          const proximoBloco = fluxo.blocos.find(b => b.nome === opcao.proximoBloco);
-          if (proximoBloco) {
-            await sock.sendMessage(sender, { text: proximoBloco.mensagem });
-            atendimentosManuais[chaveAtendimento].blocoAtual = proximoBloco.nome;
-            return;
-          }
-        } else {
-          await sock.sendMessage(sender, { text: '🤖 Opção inválida. Por favor, escolha uma das opções do menu.' });
-          return;
-        }
+    // Início de conversa
+    if (saudacoes.includes(textoLower) && !atendimentosManuais[chaveAtendimento]) {
+      if (!empresaDB.setores || empresaDB.setores.length === 0) {
+        await sock.sendMessage(sender, { text: 'Nenhum setor configurado. Contate o suporte.' });
+        return;
       }
-    } else {
-      // Se não tem blocoAtual, inicia pelo bloco inicial
-      const blocoInicial = fluxo.blocos.find(b => b.nome === 'inicial');
-      if (blocoInicial) {
-        await sock.sendMessage(sender, { text: blocoInicial.mensagem });
-        atendimentosManuais[chaveAtendimento].blocoAtual = 'inicial';
+
+      atendimentosManuais[chaveAtendimento] = { etapa: 'escolha_setor' };
+      
+      const listaSetores = empresaDB.setores
+        .filter(s => s.ativo)
+        .map((s, i) => `${i + 1} - ${s.nome}`)
+        .join('\n');
+
+      await sock.sendMessage(sender, { 
+        text: `Olá! Escolha um setor:\n\n${listaSetores}\n\nDigite #sair para cancelar` 
+      });
+      return;
+    }
+
+    // Processando escolha de setor
+    if (atendimentosManuais[chaveAtendimento]?.etapa === 'escolha_setor') {
+      const indexEscolhido = parseInt(textoLower) - 1;
+      const setorValido = indexEscolhido >= 0 && indexEscolhido < empresaDB.setores.length;
+
+      if (setorValido) {
+        const setorEscolhido = empresaDB.setores[indexEscolhido];
+        atendimentosManuais[chaveAtendimento] = { 
+          setorAtual: setorEscolhido.nome,
+          etapa: 'atendimento' 
+        };
+
+        // Usar o handler centralizado
+        const resposta = await handleMensagem(
+          empresaDB._id,
+          setorEscolhido.nome,
+          ''
+        );
+
+        await sock.sendMessage(sender, { text: resposta.resposta });
+        return;
+      } else {
+        await sock.sendMessage(sender, { text: '❌ Opção inválida. Por favor, escolha um número da lista:' });
         return;
       }
     }
-  }
 
-    await sock.sendPresenceUpdate('composing', sender);
-    await new Promise(resolve => setTimeout(resolve, 3000));
+    // Atendimento no setor
+    if (atendimentosManuais[chaveAtendimento]?.etapa === 'atendimento') {
+      const setorAtual = atendimentosManuais[chaveAtendimento].setorAtual;
+      
+      // Mostrar "digitando..." antes de responder
+      await sock.sendPresenceUpdate('composing', sender);
 
-    const respostaIA = await chamarIA(empresa.promptIA, texto);
-    await sock.sendMessage(sender, { text: respostaIA });
+      // Processar mensagem com o handler
+      const resposta = await handleMensagem(
+        empresaDB._id,
+        setorAtual,
+        textoLower
+      );
+
+      await sock.sendMessage(sender, { text: resposta.resposta });
+
+      // Gerenciar encaminhamento entre setores
+      if (resposta.proximoSetor) {
+        atendimentosManuais[chaveAtendimento].setorAtual = resposta.proximoSetor;
+        
+        // Adicionar pequeno delay para melhor UX
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        const novaResposta = await handleMensagem(
+          empresaDB._id,
+          resposta.proximoSetor,
+          ''
+        );
+        await sock.sendMessage(sender, { text: novaResposta.resposta });
+      }
+
+      // Finalizar se necessário
+      if (resposta.terminado) {
+        delete atendimentosManuais[chaveAtendimento];
+      }
+
+      return;
+    }
+
+    // Mensagem fora de contexto
+    await sock.sendMessage(sender, { 
+      text: 'Digite "oi" para iniciar ou #sair para reiniciar.' 
+    });
+
   } catch (error) {
-    console.error('❌ Erro ao processar mensagem:', error);
+    console.error('❌ Erro no processamento:', error);
+    try {
+      await sock.sendMessage(sender, { 
+        text: 'Ocorreu um erro. Por favor, tente novamente mais tarde.' 
+      });
+    } catch (err) {
+      console.error('Erro ao enviar mensagem de erro:', err);
+    }
   }
 });
 
@@ -256,6 +432,31 @@ app.post('/api/login', async (req, res) => {
   res.json({ token, nome: USUARIO_FIXO.nome, email: USUARIO_FIXO.email });
 });
 
+// app.post('/api/empresas', async (req, res) => {
+//   const { nome, promptIA, telefone, ativo, setores } = req.body;
+
+//   try {
+//     const empresaExistente = await Empresa.findOne({ nome });
+//     if (empresaExistente) return res.status(400).json({ error: 'Empresa já existe.' });
+
+//     const novaEmpresa = new Empresa({ nome, promptIA, telefone, botAtivo: ativo, setores });
+//     await novaEmpresa.save();
+
+//     const pasta = path.join(__dirname, 'bots', nome);
+//     if (!fs.existsSync(pasta)) fs.mkdirSync(pasta, { recursive: true });
+//     fs.writeFileSync(path.join(pasta, 'prompt.txt'), promptIA);
+
+//     const { qrCodePromise } = await iniciarBot({ nome, promptIA });
+//     const qrRaw = await qrCodePromise;
+//     const qrCode = await qrcode.toDataURL(qrRaw);
+
+//     return res.json({ qrCode });
+//   } catch (err) {
+//     console.error(err);
+//     return res.status(500).json({ error: 'Erro ao cadastrar empresa.' });
+//   }
+// });
+
 app.post('/api/empresas', async (req, res) => {
   const { nome, promptIA, telefone, ativo, setores } = req.body;
 
@@ -266,20 +467,45 @@ app.post('/api/empresas', async (req, res) => {
     const novaEmpresa = new Empresa({ nome, promptIA, telefone, botAtivo: ativo, setores });
     await novaEmpresa.save();
 
+    // Cria estrutura de pasta e arquivo
     const pasta = path.join(__dirname, 'bots', nome);
     if (!fs.existsSync(pasta)) fs.mkdirSync(pasta, { recursive: true });
     fs.writeFileSync(path.join(pasta, 'prompt.txt'), promptIA);
 
+    // ✅ Adiciona fluxo padrão ao criar empresa
+    const fluxoPadrao = new Fluxo({
+      empresa: novaEmpresa._id,
+      blocos: [
+        {
+          nome: 'inicial',
+          mensagem: 'Olá! Como posso te ajudar? Escolha uma das opções abaixo:',
+          opcoes: setores.map(setor => ({
+            texto: setor.nome,
+            proximoBloco: setor.nome.toLowerCase().replace(/\s+/g, '_') // nome do bloco destino
+          }))
+        },
+        ...setores.map(setor => ({
+          nome: setor.nome.toLowerCase().replace(/\s+/g, '_'),
+          mensagem: `Você escolheu o setor *${setor.nome}*. Como posso te ajudar?`,
+          opcoes: []
+        }))
+      ]
+    });
+
+    await fluxoPadrao.save();
+
+    // Inicia o bot e QR Code
     const { qrCodePromise } = await iniciarBot({ nome, promptIA });
     const qrRaw = await qrCodePromise;
     const qrCode = await qrcode.toDataURL(qrRaw);
 
     return res.json({ qrCode });
   } catch (err) {
-    console.error(err);
+    console.error('❌ Erro ao cadastrar empresa:', err);
     return res.status(500).json({ error: 'Erro ao cadastrar empresa.' });
   }
 });
+
 
 app.get('/api/empresas', async (req, res) => {
   try {
@@ -466,30 +692,7 @@ app.post('/api/fluxos', async (req, res) => {
 
 // app.post('/api/empresas/:id/setores', async (req, res) => {
 //   const { id } = req.params;
-//   const { nome, prompt } = req.body;
-  
-//   console.log('[POST] Adicionar setor para empresa:', id);
-//   console.log('Dados recebidos:', { nome, prompt });
-
-//   try {
-//     const empresa = await Empresa.findById(id);
-//     if (!empresa) return res.status(404).send('Empresa não encontrada');
-
-//     empresa.setores.push({ nome, prompt });
-//     await empresa.save();
-
-//     res.json(empresa);
-//   } catch (err) {
-//     res.status(500).send('Erro ao adicionar setor', err);
-//   }
-// });
-
-// app.post('/api/empresas/:id/setores', async (req, res) => {
-//   const { id } = req.params;
-//   const { nome, prompt } = req.body;
-  
-//   console.log('[POST] Adicionar setor para empresa:', id);
-//   console.log('Dados recebidos:', { nome, prompt });
+//   const { nome, prompt } = req.body; // prompt vindo do front
 
 //   try {
 //     if (!mongoose.Types.ObjectId.isValid(id)) {
@@ -503,78 +706,87 @@ app.post('/api/fluxos', async (req, res) => {
 //       return res.status(400).json({ error: 'Nome e prompt são obrigatórios' });
 //     }
 
-//     empresa.setores.push({ nome, prompt });
+//     empresa.setores.push({ nome, descricao: prompt }); // ✅ corrigido aqui
 //     await empresa.save();
 
-//     res.json(empresa);
+//     res.json(empresaAtualizada);
 //   } catch (err) {
-//     console.error('Erro ao adicionar setor:', err);
-//     res.status(500).json({ error: 'Erro ao adicionar setor', details: err.message });
-//   }
-// });
-
-// app.put('/api/empresas/:id/setores/:index', async (req, res) => {
-//   const { id, index } = req.params;
-//   const { nome, prompt } = req.body;
-
-//   try {
-//     const empresa = await Empresa.findById(id);
-//     if (!empresa) return res.status(404).send('Empresa não encontrada');
-
-//     if (!empresa.setores[index]) return res.status(404).send('Setor não encontrado');
-
-//     empresa.setores[index] = { nome, prompt };
-//     await empresa.save();
-
-//     res.json(empresa);
-//   } catch (err) {
-//     res.status(500).send('Erro ao editar setor');
-//   }
-// });
-
-// app.delete('/api/empresas/:id/setores/:index', async (req, res) => {
-//   const { id, index } = req.params;
-
-//   try {
-//     const empresa = await Empresa.findById(id);
-//     if (!empresa) return res.status(404).send('Empresa não encontrada');
-
-//     if (!empresa.setores[index]) return res.status(404).send('Setor não encontrado');
-
-//     empresa.setores.splice(index, 1);
-//     await empresa.save();
-
-//     res.json(empresa);
-//   } catch (err) {
-//     res.status(500).send('Erro ao remover setor');
+//     console.error('Erro ao adicionar setor:', err); // 🔍 veja o erro real
+//     res.status(500).send('Erro ao adicionar setor');
 //   }
 // });
 
 app.post('/api/empresas/:id/setores', async (req, res) => {
-  const { id } = req.params;
-  const { nome, prompt } = req.body; // prompt vindo do front
-
   try {
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({ error: 'ID inválido' });
-    }
-
-    const empresa = await Empresa.findById(id);
+    const { nome, prompt, fluxo } = req.body;
+    
+    const empresa = await Empresa.findById(req.params.id);
     if (!empresa) return res.status(404).json({ error: 'Empresa não encontrada' });
 
-    if (!nome || !prompt) {
-      return res.status(400).json({ error: 'Nome e prompt são obrigatórios' });
+    // Validação de unicidade
+    if (empresa.setores.some(s => s.nome === nome)) {
+      return res.status(400).json({ error: 'Setor já existe' });
     }
 
-    empresa.setores.push({ nome, descricao: prompt }); // ✅ corrigido aqui
+    const novoSetor = {
+      nome,
+      prompt,
+      fluxo: fluxo || {
+        mensagemInicial: `Você está no setor ${nome}. Como posso ajudar?`,
+        opcoes: []
+      }
+    };
+
+    empresa.setores.push(novoSetor);
     await empresa.save();
 
-    res.json(empresaAtualizada);
+    // Atualiza fluxo geral da empresa
+    await atualizarFluxoGeral(empresa._id);
+
+    res.status(201).json(empresa);
   } catch (err) {
-    console.error('Erro ao adicionar setor:', err); // 🔍 veja o erro real
-    res.status(500).send('Erro ao adicionar setor');
+    res.status(500).json({ 
+      error: 'Erro ao adicionar setor',
+      details: err.message 
+    });
   }
 });
+
+async function atualizarFluxoGeral(empresaId) {
+  const empresa = await Empresa.findById(empresaId);
+  const setoresAtivos = empresa.setores.filter(s => s.ativo);
+
+  const fluxo = await Fluxo.findOneAndUpdate(
+    { empresa: empresaId },
+    {
+      $set: {
+        blocos: [
+          {
+            nome: 'inicial',
+            mensagem: 'Escolha um setor:',
+            opcoes: setoresAtivos.map(setor => ({
+              texto: setor.nome,
+              proximoBloco: `setor_${setor.nome.toLowerCase().replace(/\s+/g, '_')}`
+            }))
+          },
+          ...setoresAtivos.map(setor => ({
+            nome: `setor_${setor.nome.toLowerCase().replace(/\s+/g, '_')}`,
+            mensagem: setor.fluxo.mensagemInicial,
+            opcoes: setor.fluxo.opcoes.map(opcao => ({
+              texto: opcao.texto,
+              proximoBloco: opcao.acao === 'encaminhar' 
+                ? `setor_${opcao.destino.toLowerCase().replace(/\s+/g, '_')}`
+                : 'final'
+            }))
+          }))
+        ]
+      }
+    },
+    { upsert: true, new: true }
+  );
+
+  return fluxo;
+}
 
 app.put('/api/empresas/:id/setores/:index', async (req, res) => {
   const { id, index } = req.params;
