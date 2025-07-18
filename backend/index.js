@@ -154,7 +154,7 @@ sock.ev.on('messages.upsert', async (m) => {
           ''
         );
 
-        await sock.sendMessage(sender, { text: resposta.resposta });
+        await sock.sendMessage(sender, { text: setorEscolhido.prompt });
         return;
       } else {
         await sock.sendMessage(sender, { text: '❌ Opção inválida. Por favor, escolha um número da lista:' });
@@ -297,6 +297,28 @@ app.post('/api/empresas', async (req, res) => {
     const pasta = path.join(__dirname, 'bots', nome);
     if (!fs.existsSync(pasta)) fs.mkdirSync(pasta, { recursive: true });
     fs.writeFileSync(path.join(pasta, 'prompt.txt'), promptIA);
+
+    // ✅ Adiciona fluxo padrão ao criar empresa
+    const fluxoPadrao = new Fluxo({
+      empresa: novaEmpresa._id,
+      blocos: [
+        {
+          nome: 'inicial',
+          mensagem: 'Olá! Como posso te ajudar? Escolha uma das opções abaixo:',
+          opcoes: setores.map(setor => ({
+            texto: setor.nome,
+            proximoBloco: setor.nome.toLowerCase().replace(/\s+/g, '_') // nome do bloco destino
+          }))
+        },
+        ...setores.map(setor => ({
+          nome: setor.nome.toLowerCase().replace(/\s+/g, '_'),
+          mensagem: `Você escolheu o setor *${setor.nome}*. Como posso te ajudar?`,
+          opcoes: []
+        }))
+      ]
+    });
+
+    await fluxoPadrao.save();
 
     // Inicia o bot e QR Code
     const { qrCodePromise } = await iniciarBot({ nome, promptIA });
