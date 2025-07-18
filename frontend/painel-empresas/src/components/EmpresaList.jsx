@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import styled from 'styled-components';
 import api from '../services/api';
-import axios from 'axios';
 
 const Container = styled.div`
   max-width: 700px;
@@ -11,19 +10,19 @@ const Container = styled.div`
   border-radius: 8px;
   box-shadow: 0 4px 12px rgba(0,0,0,0.1);
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-`
+`;
 
 const Title = styled.h2`
   text-align: center;
   margin-bottom: 2rem;
   color: #14213d;
-`
+`;
 
 const List = styled.ul`
   list-style: none;
   padding: 0;
   margin: 0;
-`
+`;
 
 const Item = styled.li`
   background-color: white;
@@ -32,18 +31,18 @@ const Item = styled.li`
   padding: 1rem 1.5rem;
   margin-bottom: 1.5rem;
   box-shadow: 0 2px 6px rgba(0,0,0,0.07);
-`
+`;
 
 const Strong = styled.strong`
   font-size: 1.2rem;
   color: #14213d;
-`
+`;
 
 const Paragraph = styled.p`
   margin: 0.3rem 0;
   color: #333;
   font-size: 0.95rem;
-`
+`;
 
 const Label = styled.label`
   display: flex;
@@ -58,7 +57,7 @@ const Label = styled.label`
     height: 16px;
     cursor: pointer;
   }
-`
+`;
 
 const Input = styled.input`
   width: 100%;
@@ -74,7 +73,7 @@ const Input = styled.input`
     border-color: #2a9df4;
     background-color: #e8f0fe;
   }
-`
+`;
 
 const Button = styled.button`
   padding: 0.55rem 1.1rem;
@@ -94,24 +93,24 @@ const Button = styled.button`
     background-color: #a3a3a3;
     cursor: not-allowed;
   }
-`
+`;
 
 const ButtonPrimary = styled(Button)`
   background-color: #14213d;
   color: white;
-`
+`;
 
 const ButtonSecondary = styled(Button)`
   background-color: #e0e0e0;
   color: #333;
   margin-left: 1rem;
-`
+`;
 
 const ButtonDanger = styled(Button)`
   background-color: #d90429;
   color: white;
   margin-left: 1rem;
-`
+`;
 
 const QRCodeWrapper = styled.div`
   margin-top: 1rem;
@@ -128,13 +127,13 @@ const QRCodeWrapper = styled.div`
     border-radius: 10px;
     box-shadow: 0 4px 8px rgba(0,0,0,0.15);
   }
-`
+`;
 
 const ButtonGroup = styled.div`
   margin-top: 1rem;
   display: flex;
   align-items: center;
-`
+`;
 
 const TextArea = styled.textarea`
   width: 100%;
@@ -154,12 +153,12 @@ const TextArea = styled.textarea`
   }
 `;
 
-
 const SetorContainer = styled.div`
   background-color: #f0f4f9;
   padding: 1rem;
   border-radius: 8px;
   margin-top: 0.75rem;
+  position: relative;
 `;
 
 const EmpresasList = () => {
@@ -175,6 +174,7 @@ const EmpresasList = () => {
     botAtivo: true,
     setores: []
   });
+  const [erro, setErro] = useState('');
 
   useEffect(() => {
     const fetchEmpresas = async () => {
@@ -188,80 +188,8 @@ const EmpresasList = () => {
     fetchEmpresas();
   }, []);
 
-  const adicionarSetor = async (idEmpresa) => {
-  // const novoSetor = { nome: '', prompt: '' };
-
-  const nomeSetor = prompt('Digite o nome do novo setor:');
-
-  if (!nomeSetor || nomeSetor.trim() === '') {
-    alert('Nome do setor é obrigatório.');
-    return;
-  }
-
-  const novoSetor = { nome: nomeSetor.trim(), prompt: '' };
-
-  try {
-    const res = await api.post(`/empresas/${idEmpresa}/setores`, novoSetor);
-    setEmpresas((prev) =>
-      prev.map((e) => (e._id === idEmpresa ? res.data : e))
-    );
-    iniciarEdicao(res.data); // atualiza edição com empresa atualizada
-  } catch (err) {
-    console.error('Erro ao adicionar setor:', err);
-    alert('Erro ao adicionar setor.');
-  }
-};
-
-// const editarSetor = async (idEmpresa, index, novoSetor) => {
-//   try {
-//     const res = await api.put(`/empresas/${idEmpresa}/setores/${index}`, novoSetor);
-//     setEmpresas((prev) =>
-//       prev.map((e) => (e._id === idEmpresa ? res.data : e))
-//     );
-//   } catch (err) {
-//     console.error('Erro ao editar setor:', err);
-//     alert('Erro ao editar setor.');
-//   }
-// };
-
-const editarSetor = async (idEmpresa, setorIndex) => {
-  const setor = formData.setores[setorIndex];
-
-  if (!setor._id) {
-    console.warn('Setor não salvo ainda');
-    return;
-  }
-
-  try {
-    const response = await axios.put(
-      `http://localhost:3000/api/empresas/${idEmpresa}/setores/${setorIndex}`,
-      {
-        nome: setor.nome,
-        promptIA: setor.promptIA, // adicione aqui os campos que você deseja editar
-      }
-    );
-    console.log('Setor editado:', response.data);
-  } catch (error) {
-    console.error('Erro ao editar setor:', error.response?.data || error.message);
-  }
-};
-
-
-const removerSetor = async (idEmpresa, index) => {
-  if (!window.confirm('Deseja realmente remover este setor?')) return;
-  try {
-    const res = await api.delete(`/empresas/${idEmpresa}/setores/${index}`);
-    setEmpresas((prev) =>
-      prev.map((e) => (e._id === idEmpresa ? res.data : e))
-    );
-    iniciarEdicao(res.data);
-  } catch (err) {
-    console.error('Erro ao remover setor:', err);
-    alert('Erro ao remover setor.');
-  }
-};
-
   const iniciarEdicao = (empresa) => {
+    setErro('');
     setEmpresaEditando(empresa._id);
     setFormData({
       nome: empresa.nome || '',
@@ -272,35 +200,75 @@ const removerSetor = async (idEmpresa, index) => {
     });
   };
 
-  // const iniciarEdicao = (empresa) => {
-  //   setEmpresaEditando(empresa._id);
-  //   setFormData({
-  //     nome: empresa.nome || '',
-  //     promptIA: empresa.promptIA || '',
-  //     telefone: empresa.telefone || '',
-  //     botAtivo: empresa.botAtivo ?? true,
-  //     setores: empresa.setores || []
-  //   });
-  // };
+  const adicionarSetor = () => {
+    setFormData((prev) => ({
+      ...prev,
+      setores: [...prev.setores, { nome: '', prompt: '' }]
+    }));
+  };
+
+  const removerSetor = (index) => {
+    setFormData((prev) => ({
+      ...prev,
+      setores: prev.setores.filter((_, i) => i !== index)
+    }));
+  };
 
   const salvarEdicao = async (idEmpresa) => {
+    setErro('');
+    // Validação
+    if (!formData.nome.trim()) {
+      setErro('Nome da empresa é obrigatório.');
+      return;
+    }
+    if (!formData.telefone.trim()) {
+      setErro('Telefone da empresa é obrigatório.');
+      return;
+    }
+
+    // Se tiver setores, validar todos
+    if (formData.setores.length > 0) {
+      const invalidos = formData.setores.some(
+        (s) => !s.nome.trim() || !s.prompt.trim()
+      );
+      if (invalidos) {
+        setErro('Todos os setores devem ter nome e prompt preenchidos.');
+        return;
+      }
+    } else {
+      // Se não tiver setores, validar promptIA
+      if (!formData.promptIA.trim()) {
+        setErro('Prompt IA é obrigatório se não houver setores.');
+        return;
+      }
+    }
+
+    // Montar payload: se tiver setores, promptIA geral pode ser vazio ou setado
+    const payload = {
+      nome: formData.nome.trim(),
+      telefone: formData.telefone.trim(),
+      botAtivo: formData.botAtivo,
+      setores: formData.setores.length > 0 ? formData.setores : [],
+      promptIA: formData.setores.length === 0 ? formData.promptIA.trim() : '',
+    };
+
     try {
-      const res = await api.put(`/empresas/${idEmpresa}`, formData);
+      const res = await api.put(`/empresas/${idEmpresa}`, payload);
       setEmpresas((prev) =>
         prev.map((e) => (e._id === idEmpresa ? res.data : e))
       );
-      cancelarEdicao();
+      setEmpresaEditando(null);
     } catch (err) {
       console.error('Erro ao editar empresa:', err);
-      alert('Erro ao editar empresa.');
+      setErro('Erro ao salvar empresa. Tente novamente.');
     }
   };
 
   const cancelarEdicao = () => {
     setEmpresaEditando(null);
     setFormData({ nome: '', promptIA: '', telefone: '', botAtivo: true, setores: [] });
+    setErro('');
   };
-
 
   const empresasFiltradas = empresas.filter((empresa) =>
     empresa.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -368,6 +336,12 @@ const removerSetor = async (idEmpresa, index) => {
         style={{ marginBottom: '1.5rem' }}
       />
 
+      {erro && (
+        <Paragraph style={{ color: 'red', fontWeight: '600', textAlign: 'center' }}>
+          {erro}
+        </Paragraph>
+      )}
+
       <List>
         {empresasFiltradas.map((empresa) => (
           <Item key={empresa._id}>
@@ -390,7 +364,6 @@ const removerSetor = async (idEmpresa, index) => {
                   <>
                     {formData.setores.map((setor, index) => (
                       <SetorContainer key={index}>
-                        {/* Nos inputs dos setores: */}
                         <Input
                           type="text"
                           placeholder={`Nome do setor ${index + 1}`}
@@ -400,7 +373,6 @@ const removerSetor = async (idEmpresa, index) => {
                             novos[index].nome = e.target.value;
                             setFormData({ ...formData, setores: novos });
                           }}
-                          onBlur={() => editarSetor(empresa._id, index, formData.setores[index])}
                         />
 
                         <TextArea
@@ -411,16 +383,17 @@ const removerSetor = async (idEmpresa, index) => {
                             novos[index].prompt = e.target.value;
                             setFormData({ ...formData, setores: novos });
                           }}
-                          // onBlur={() => editarSetor(empresa._id, index, formData.setores[index])}
                         />
-                        <button onClick={() => editarSetor(empresa._id, index)}>
-                        Salvar Prompt
-                       </button>
 
-                        <ButtonDanger onClick={() => removerSetor(empresa._id, index)}>Remover setor</ButtonDanger>
-
+                        <ButtonDanger onClick={() => removerSetor(index)}>
+                          Remover setor
+                        </ButtonDanger>
                       </SetorContainer>
                     ))}
+
+                    <ButtonSecondary onClick={adicionarSetor} style={{ marginTop: '1rem' }}>
+                      Adicionar setor
+                    </ButtonSecondary>
                   </>
                 ) : (
                   <>
@@ -429,7 +402,9 @@ const removerSetor = async (idEmpresa, index) => {
                       value={formData.promptIA}
                       onChange={(e) => setFormData({ ...formData, promptIA: e.target.value })}
                     />
-                    <ButtonSecondary onClick={adicionarSetor}>Deseja usar setores?</ButtonSecondary>
+                    <ButtonSecondary onClick={adicionarSetor} style={{ marginTop: '1rem' }}>
+                      Deseja usar setores? Adicione um setor
+                    </ButtonSecondary>
                   </>
                 )}
 
@@ -442,8 +417,10 @@ const removerSetor = async (idEmpresa, index) => {
                   Bot ativo
                 </Label>
 
-                <ButtonPrimary onClick={() => salvarEdicao(empresa._id)}>Salvar</ButtonPrimary>
-                <ButtonSecondary onClick={cancelarEdicao}>Cancelar</ButtonSecondary>
+                <ButtonGroup>
+                  <ButtonPrimary onClick={() => salvarEdicao(empresa._id)}>Salvar</ButtonPrimary>
+                  <ButtonSecondary onClick={cancelarEdicao}>Cancelar</ButtonSecondary>
+                </ButtonGroup>
               </div>
             ) : (
               <div>
@@ -497,4 +474,3 @@ const removerSetor = async (idEmpresa, index) => {
 };
 
 export default EmpresasList;
-

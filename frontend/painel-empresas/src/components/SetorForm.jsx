@@ -109,3 +109,5 @@ const SetorForm = ({ setor, onSave, onRemove }) => {
 };
 
 export default SetorForm;
+
+// Tratando os setores
