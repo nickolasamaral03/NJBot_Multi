@@ -42,7 +42,7 @@ async function handleMensagem(empresaId, setorNome, mensagemUsuario) {
       resposta: setor.fluxo.mensagemInicial,
       opcoes: setor.fluxo.opcoes.map(o => o.texto)
     };
-  }
+  } // respostas programadas
 
   // 2. Fallback para IA generativa
   return {

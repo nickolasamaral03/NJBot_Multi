@@ -317,7 +317,7 @@ sock.ev.on('messages.upsert', async (m) => {
           ''
         );
 
-        await sock.sendMessage(sender, { text: resposta.resposta });
+        await sock.sendMessage(sender, { text: setorEscolhido.prompt });
         return;
       } else {
         await sock.sendMessage(sender, { text: '❌ Opção inválida. Por favor, escolha um número da lista:' });
@@ -464,7 +464,13 @@ app.post('/api/empresas', async (req, res) => {
     const empresaExistente = await Empresa.findOne({ nome });
     if (empresaExistente) return res.status(400).json({ error: 'Empresa já existe.' });
 
-    const novaEmpresa = new Empresa({ nome, promptIA, telefone, botAtivo: ativo, setores });
+    const setoresArr = Array.isArray(setores)
+    ? setores
+    : setores
+      ? [{ nome, prompt: promptIA, ativo: true }]
+      : []; // Quando é somente um setor
+
+    const novaEmpresa = new Empresa({ nome, promptIA, telefone, botAtivo: ativo, setores: setoresArr });
     await novaEmpresa.save();
 
     // Cria estrutura de pasta e arquivo
@@ -479,12 +485,12 @@ app.post('/api/empresas', async (req, res) => {
         {
           nome: 'inicial',
           mensagem: 'Olá! Como posso te ajudar? Escolha uma das opções abaixo:',
-          opcoes: setores.map(setor => ({
+          opcoes: setoresArr.map(setor => ({
             texto: setor.nome,
-            proximoBloco: setor.nome.toLowerCase().replace(/\s+/g, '_') // nome do bloco destino
+            proximoBloco: setor.nome.toLowerCase().replace(/\s+/g, '_')
           }))
         },
-        ...setores.map(setor => ({
+        ...setoresArr.map(setor => ({
           nome: setor.nome.toLowerCase().replace(/\s+/g, '_'),
           mensagem: `Você escolheu o setor *${setor.nome}*. Como posso te ajudar?`,
           opcoes: []
