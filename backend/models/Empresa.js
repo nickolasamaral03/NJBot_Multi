@@ -49,3 +49,4 @@ module.exports = mongoose.model('Empresa', EmpresaSchema);
 
 // AGORA SALVAMOS O SETOR COMO UM OBJETO DENTRO DA EMPRESA
 // E CADA SETOR PODE TER SEU PRÓPRIO FLUXO DE ATENDIMENTO
+

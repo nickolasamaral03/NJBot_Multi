@@ -11,7 +11,7 @@ const { Boom } = require('@hapi/boom');
 const Empresa = require('./models/Empresa');
 // const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-// const Fluxo = require('./models/Fluxo');
+const Fluxo = require('./models/Fluxo');
 const { handleMensagem } = require('./handlers/chatbot');
 
 const app = express();
@@ -73,6 +73,8 @@ async function iniciarBot(empresa) {
 sock.ev.on('messages.upsert', async (m) => {
   const saudacoes = ['oi', 'olá', 'ola', 'bom dia', 'boa tarde', 'boa noite'];
   const comandosEspeciais = ['#sair', '#bot', 'atendente'];
+
+  console.log('Mensagem recebida', m)
   
   try {
     const msg = m.messages[0];
@@ -84,11 +86,16 @@ sock.ev.on('messages.upsert', async (m) => {
     const idEmpresa = msg.key.remoteJid.split('@')[0]; // Adapte conforme necessário
     const chaveAtendimento = `${idEmpresa}_${sender}`;
 
+    console.log('ID extraído:', idEmpresa);
+
     // Obter instância da empresa
     // const empresaDB = await Empresa.findById(idEmpresa);
 
     const empresaDB = await Empresa.findOne({ telefone: idEmpresa });
     if (!empresaDB?.botAtivo) return;
+    console.log('Empresa encontrada:', empresaDB);
+
+    console.log(JSON.stringify(msg, null, 2));
 
     // Verificar comandos especiais
     if (comandosEspeciais.includes(textoLower)) {
@@ -217,6 +224,32 @@ sock.ev.on('messages.upsert', async (m) => {
     }
   }
 });
+
+// sock.ev.on("messages.upsert", async ({ messages, type }) => {
+//   const msg = messages[0];
+//   if (!msg.message || msg.key.fromMe) return;
+
+//   const texto = msg.message.conversation || msg.message.extendedTextMessage?.text;
+//   const remoteJid = msg.key.remoteJid;
+
+//   console.log("Mensagem recebida:", texto);
+
+//   if (texto) {
+//     const pergunta = texto.trim();
+//     const prompt = `Você é um assistente educado e prestativo. Responda claramente:\nUsuário: ${pergunta}`;
+
+//     try {
+//       console.log("Prompt enviado para IA:", prompt);
+
+//       const resposta = await gerarRespostaGemini(prompt, pergunta);
+//       console.log("Resposta da IA:", resposta);
+
+//       await sock.sendMessage(remoteJid, { text: resposta }, { quoted: msg });
+//     } catch (erro) {
+//       console.error("Erro ao processar mensagem:", erro);
+//     }
+//   }
+// });
 
   bots[empresa.nome] = sock;
 

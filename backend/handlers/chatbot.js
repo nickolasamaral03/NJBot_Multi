@@ -1,6 +1,7 @@
 // handlers/chatbot.js
 async function handleMensagem(empresaId, setorNome, mensagemUsuario) {
   const empresa = await Empresa.findById(empresaId);
+  console.log('handleMensagem:', empresaId, setorNome, mensagemUsuario);
   
   if (!empresa?.botAtivo) {
     throw new Error('Empresa não encontrada ou bot desativado');
@@ -49,6 +50,7 @@ async function handleMensagem(empresaId, setorNome, mensagemUsuario) {
     resposta: await gerarRespostaIA(setor.prompt, mensagemUsuario),
     terminado: true
   };
+
 }
 
 // VAI LIDAR COM A PARTE DE SETORES E SE NÃO TIVER RESPOSTA VAI CHAMAR A IA
