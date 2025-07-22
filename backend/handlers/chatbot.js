@@ -1,4 +1,7 @@
 // handlers/chatbot.js
+const Empresa = require('../models/Empresa');
+const { gerarRespostaGemini } = require('../gemini'); // ou use alias
+
 async function handleMensagem(empresaId, setorNome, mensagemUsuario) {
   const empresa = await Empresa.findById(empresaId);
   console.log('handleMensagem:', empresaId, setorNome, mensagemUsuario);
@@ -47,10 +50,13 @@ async function handleMensagem(empresaId, setorNome, mensagemUsuario) {
 
   // 2. Fallback para IA generativa
   return {
-    resposta: await gerarRespostaIA(setor.prompt, mensagemUsuario),
+    resposta: await gerarRespostaGemini(setor.prompt, mensagemUsuario),
     terminado: true
   };
 
 }
 
+module.exports = handleMensagem;
+
 // VAI LIDAR COM A PARTE DE SETORES E SE NÃO TIVER RESPOSTA VAI CHAMAR A IA
+// RESPONDE CONFORME O PROMPT? SIM agora

@@ -12,7 +12,7 @@ const Empresa = require('./models/Empresa');
 // const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const Fluxo = require('./models/Fluxo');
-const { handleMensagem } = require('./handlers/chatbot');
+const handleMensagem = require('./handlers/chatbot');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -67,186 +67,382 @@ async function iniciarBot(empresa) {
     if (connection === 'open') {
       console.log(`🤖 Conectado com sucesso: ${empresa.nome}`);
     }
+ 
   });
 
 
 sock.ev.on('messages.upsert', async (m) => {
-  const saudacoes = ['oi', 'olá', 'ola', 'bom dia', 'boa tarde', 'boa noite'];
-  const comandosEspeciais = ['#sair', '#bot', 'atendente'];
-
-  console.log('Mensagem recebida', m)
-  
   try {
-    const msg = m.messages[0];
-    if (!msg.message) return;
+    const msg = m.messages?.[0];
+    if (!msg || !msg.message || msg.key.fromMe) return;
+
+    // Logs de depuração
+    console.log('\n🟢 Nova mensagem recebida');
+    console.log('De:', msg.key.remoteJid);
+    console.log('Push name:', msg.pushName);
+    console.log('Mensagem completa:', JSON.stringify(msg.message, null, 2));
 
     const sender = msg.key.remoteJid;
-    const texto = msg.message.conversation || msg.message.extendedTextMessage?.text || '';
+    const texto =
+      msg.message?.conversation ||
+      msg.message?.extendedTextMessage?.text ||
+      msg.message?.imageMessage?.caption ||
+      msg.message?.videoMessage?.caption ||
+      msg.message?.documentMessage?.caption ||
+      msg.message?.buttonsResponseMessage?.selectedButtonId ||
+      msg.message?.listResponseMessage?.singleSelectReply?.selectedRowId ||
+      '';
+
     const textoLower = texto.toLowerCase().trim();
-    const idEmpresa = msg.key.remoteJid.split('@')[0]; // Adapte conforme necessário
-    const chaveAtendimento = `${idEmpresa}_${sender}`;
+    console.log('📨 Conteúdo da mensagem:', textoLower);
 
-    console.log('ID extraído:', idEmpresa);
+    // Use a empresa diretamente passada na função iniciarBot
+    const empresaDB = empresa;
+    if (!empresaDB?.botAtivo) {
+      console.log(`⚠️ Bot da empresa "${empresaDB.nome}" está desativado. Ignorando mensagem.`);
+      return;
+    }
 
-    // Obter instância da empresa
-    // const empresaDB = await Empresa.findById(idEmpresa);
+    const chaveAtendimento = `${empresaDB._id}_${sender}`;
+    const saudacoes = ['oi', 'olá', 'ola', 'bom dia', 'boa tarde', 'boa noite'];
+    const comandosEspeciais = ['#sair', '#bot', 'atendente'];
 
-    const empresaDB = await Empresa.findOne({ telefone: idEmpresa });
-    if (!empresaDB?.botAtivo) return;
-    console.log('Empresa encontrada:', empresaDB);
-
-    console.log(JSON.stringify(msg, null, 2));
-
-    // Verificar comandos especiais
+    // === Comandos Especiais ===
     if (comandosEspeciais.includes(textoLower)) {
       if (textoLower === '#sair') {
         delete atendimentosManuais[chaveAtendimento];
-        await sock.sendMessage(sender, { text: 'Conversa reiniciada. Digite "oi" para começar.' });
+        await sock.sendMessage(sender, { text: '✅ Conversa reiniciada. Digite "oi" para começar.' });
         return;
       }
+
       if (textoLower === '#bot') {
         atendimentosManuais[chaveAtendimento] = { ativo: false };
-        await sock.sendMessage(sender, { text: 'Modo automático ativado.' });
+        await sock.sendMessage(sender, { text: '🤖 Atendimento automático ativado.' });
         return;
       }
+
       if (textoLower.includes('atendente')) {
         atendimentosManuais[chaveAtendimento] = { ativo: true, ultimoContato: new Date() };
-        await sock.sendMessage(sender, { text: 'Solicitação enviada ao atendente humano.' });
+        await sock.sendMessage(sender, { text: '📨 Solicitação enviada ao atendente humano.' });
         return;
       }
     }
 
-    // Se em atendimento manual
+    // === Atendimento Humano Ativo ===
     if (atendimentosManuais[chaveAtendimento]?.ativo) {
       atendimentosManuais[chaveAtendimento].ultimoContato = new Date();
+      console.log(`👤 Atendimento humano ativo para: ${sender}`);
       return;
     }
 
-    // Início de conversa
-    if (saudacoes.includes(textoLower) && !atendimentosManuais[chaveAtendimento]) {
-      if (!empresaDB.setores || empresaDB.setores.length === 0) {
-        await sock.sendMessage(sender, { text: 'Nenhum setor configurado. Contate o suporte.' });
-        return;
-      }
+  if (saudacoes.includes(textoLower) && !atendimentosManuais[chaveAtendimento]) {
+  const setoresAtivos = empresaDB.setores?.filter(s => s.ativo) || [];
 
-      atendimentosManuais[chaveAtendimento] = { etapa: 'escolha_setor' };
-      
-      const listaSetores = empresaDB.setores
-        .filter(s => s.ativo)
-        .map((s, i) => `${i + 1} - ${s.nome}`)
-        .join('\n');
+  if (setoresAtivos.length === 0) {
+    await sock.sendMessage(sender, {
+      text: '⚠️ Nenhum setor configurado. Contate o suporte.'
+    });
+    return;
+  }
 
-      await sock.sendMessage(sender, { 
-        text: `Olá! Escolha um setor:\n\n${listaSetores}\n\nDigite #sair para cancelar` 
-      });
-      return;
-    }
+  if (setoresAtivos.length === 1) {
+    const setorUnico = setoresAtivos[0];
+    atendimentosManuais[chaveAtendimento] = {
+      setorAtual: setorUnico.nome,
+      etapa: 'atendimento'
+    };
 
-    // Processando escolha de setor
+    console.log(`📌 Entrando diretamente no setor único: ${setorUnico.nome}`);
+
+    await sock.sendMessage(sender, {
+      text: setorUnico.fluxo?.mensagemInicial ||
+        `📍 Você está no setor ${setorUnico.nome}. Como posso ajudar?`
+    });
+
+    return;
+  }
+
+  // Se tiver mais de um setor, mostra lista
+  atendimentosManuais[chaveAtendimento] = { etapa: 'escolha_setor' };
+
+  const listaSetores = setoresAtivos
+    .map((s, i) => `${i + 1} - ${s.nome}`)
+    .join('\n');
+
+  await sock.sendMessage(sender, {
+    text: `Olá! 👋 Escolha um setor:\n\n${listaSetores}\n\nDigite #sair para cancelar`
+  });
+
+  return;
+}
+
+    // === Escolha de Setor ===
     if (atendimentosManuais[chaveAtendimento]?.etapa === 'escolha_setor') {
       const indexEscolhido = parseInt(textoLower) - 1;
-      const setorValido = indexEscolhido >= 0 && indexEscolhido < empresaDB.setores.length;
+      const setores = empresaDB.setores.filter(s => s.ativo);
+      const setorValido = indexEscolhido >= 0 && indexEscolhido < setores.length;
 
       if (setorValido) {
-        const setorEscolhido = empresaDB.setores[indexEscolhido];
-        atendimentosManuais[chaveAtendimento] = { 
+        const setorEscolhido = setores[indexEscolhido];
+        atendimentosManuais[chaveAtendimento] = {
           setorAtual: setorEscolhido.nome,
-          etapa: 'atendimento' 
+          etapa: 'atendimento'
         };
 
-        // Usar o handler centralizado
-        const resposta = await handleMensagem(
-          empresaDB._id,
-          setorEscolhido.nome,
-          ''
-        );
+        // await sock.sendMessage(sender, { text: setorEscolhido.prompt || `📍 Você escolheu o setor ${setorEscolhido.nome}. Como posso ajudar?` });
+        await sock.sendMessage(sender, { 
+        text: setorEscolhido.fluxo?.mensagemInicial || `📍 Você está no setor ${setorEscolhido.nome}. Como posso ajudar?`
+      });
 
-        await sock.sendMessage(sender, { text: setorEscolhido.prompt });
         return;
       } else {
-        await sock.sendMessage(sender, { text: '❌ Opção inválida. Por favor, escolha um número da lista:' });
+        await sock.sendMessage(sender, { text: '❌ Opção inválida. Por favor, escolha um número da lista.' });
         return;
       }
     }
 
-    // Atendimento no setor
+    // === Atendimento do Setor ===
     if (atendimentosManuais[chaveAtendimento]?.etapa === 'atendimento') {
       const setorAtual = atendimentosManuais[chaveAtendimento].setorAtual;
-      
-      // Mostrar "digitando..." antes de responder
+
+      // Mostra "digitando..."
       await sock.sendPresenceUpdate('composing', sender);
 
-      // Processar mensagem com o handler
       const resposta = await handleMensagem(
         empresaDB._id,
         setorAtual,
         textoLower
       );
 
+      console.log(`🧠 Resposta IA (${setorAtual}):`, resposta);
+
       await sock.sendMessage(sender, { text: resposta.resposta });
 
-      // Gerenciar encaminhamento entre setores
       if (resposta.proximoSetor) {
         atendimentosManuais[chaveAtendimento].setorAtual = resposta.proximoSetor;
-        
-        // Adicionar pequeno delay para melhor UX
         await new Promise(resolve => setTimeout(resolve, 500));
-        
+
         const novaResposta = await handleMensagem(
           empresaDB._id,
           resposta.proximoSetor,
           ''
         );
+
         await sock.sendMessage(sender, { text: novaResposta.resposta });
       }
 
-      // Finalizar se necessário
-      if (resposta.terminado) {
-        delete atendimentosManuais[chaveAtendimento];
-      }
+      // if (resposta.terminado) {
+      //   delete atendimentosManuais[chaveAtendimento];
+      // }
 
       return;
     }
 
-    // Mensagem fora de contexto
-    await sock.sendMessage(sender, { 
-      text: 'Digite "oi" para iniciar ou #sair para reiniciar.' 
+    // === Mensagem fora de fluxo ===
+    await sock.sendMessage(sender, {
+      text: '❓ Não entendi. Digite "oi" para começar ou #sair para reiniciar.'
     });
 
-  } catch (error) {
-    console.error('❌ Erro no processamento:', error);
+  } catch (err) {
+    console.error('❌ Erro no processamento da mensagem:', err);
     try {
-      await sock.sendMessage(sender, { 
-        text: 'Ocorreu um erro. Por favor, tente novamente mais tarde.' 
+      await sock.sendMessage(msg?.key?.remoteJid || 'desconhecido', {
+        text: '⚠️ Ocorreu um erro. Tente novamente mais tarde.'
       });
-    } catch (err) {
-      console.error('Erro ao enviar mensagem de erro:', err);
+    } catch (erroEnvio) {
+      console.error('Erro ao enviar mensagem de erro:', erroEnvio);
     }
   }
 });
 
-// sock.ev.on("messages.upsert", async ({ messages, type }) => {
-//   const msg = messages[0];
-//   if (!msg.message || msg.key.fromMe) return;
 
-//   const texto = msg.message.conversation || msg.message.extendedTextMessage?.text;
-//   const remoteJid = msg.key.remoteJid;
+// sock.ev.on('messages.upsert', async (m) => {
+//   try {
+//     const msg = m.messages?.[0];
+//     if (!msg || !msg.message || msg.key.fromMe) return;
 
-//   console.log("Mensagem recebida:", texto);
+//     // Logs iniciais
+//     console.log('\n🟢 Nova mensagem recebida');
+//     console.log('De:', msg.key.remoteJid);
+//     console.log('Push name:', msg.pushName);
+//     console.log('Mensagem completa:', JSON.stringify(msg.message, null, 2));
 
-//   if (texto) {
-//     const pergunta = texto.trim();
-//     const prompt = `Você é um assistente educado e prestativo. Responda claramente:\nUsuário: ${pergunta}`;
+//     const sender = msg.key.remoteJid;
+//     const texto =
+//       msg.message?.conversation ||
+//       msg.message?.extendedTextMessage?.text ||
+//       msg.message?.imageMessage?.caption ||
+//       msg.message?.videoMessage?.caption ||
+//       msg.message?.documentMessage?.caption ||
+//       msg.message?.buttonsResponseMessage?.selectedButtonId ||
+//       msg.message?.listResponseMessage?.singleSelectReply?.selectedRowId ||
+//       '';
 
+//     const textoLower = texto.toLowerCase().trim();
+//     console.log('📨 Conteúdo da mensagem:', textoLower);
+
+//     const empresaDB = empresa;
+//     if (!empresaDB?.botAtivo) {
+//       console.log(`⚠️ Bot da empresa "${empresaDB.nome}" está desativado. Ignorando mensagem.`);
+//       return;
+//     }
+
+//     const chaveAtendimento = `${empresaDB._id}_${sender}`;
+//     const saudacoes = ['oi', 'olá', 'ola', 'bom dia', 'boa tarde', 'boa noite'];
+//     const comandosEspeciais = ['#sair', '#bot', 'atendente'];
+
+//     // === Comandos Especiais ===
+//     if (comandosEspeciais.includes(textoLower)) {
+//       if (textoLower === '#sair') {
+//         delete atendimentosManuais[chaveAtendimento];
+//         await sock.sendMessage(sender, { text: '✅ Conversa reiniciada. Digite "oi" para começar.' });
+//         return;
+//       }
+
+//       if (textoLower === '#bot') {
+//         if (!atendimentosManuais[chaveAtendimento]) {
+//           atendimentosManuais[chaveAtendimento] = {};
+//         }
+//         atendimentosManuais[chaveAtendimento].ativo = false;
+//         await sock.sendMessage(sender, { text: '🤖 Atendimento automático ativado.' });
+//         return;
+//       }
+
+//       if (textoLower.includes('atendente')) {
+//         if (!atendimentosManuais[chaveAtendimento]) {
+//           atendimentosManuais[chaveAtendimento] = {};
+//         }
+//         atendimentosManuais[chaveAtendimento].ativo = true;
+//         atendimentosManuais[chaveAtendimento].ultimoContato = new Date();
+
+//         console.log(`👤 Atendimento humano ativado para ${chaveAtendimento}`);
+//         await sock.sendMessage(sender, { text: '📨 Atendimento humano ativado. Aguarde o atendente.' });
+//         return;
+//       }
+//     }
+
+//     // === Bloqueio se humano ativo ===
+//     if (atendimentosManuais[chaveAtendimento]?.ativo) {
+//       atendimentosManuais[chaveAtendimento].ultimoContato = new Date();
+//       console.log(`🚫 Atendimento automático bloqueado por humano para ${chaveAtendimento}`);
+//       return;
+//     }
+
+//     // === Início de Conversa ===
+//     if (saudacoes.includes(textoLower) && !atendimentosManuais[chaveAtendimento]) {
+//       const setoresAtivos = empresaDB.setores?.filter(s => s.ativo) || [];
+
+//       if (setoresAtivos.length === 0) {
+//         await sock.sendMessage(sender, {
+//           text: '⚠️ Nenhum setor configurado. Contate o suporte.'
+//         });
+//         return;
+//       }
+
+//       if (setoresAtivos.length === 1) {
+//         const setorUnico = setoresAtivos[0];
+//         atendimentosManuais[chaveAtendimento] = {
+//           setorAtual: setorUnico.nome,
+//           etapa: 'atendimento',
+//           ativo: false
+//         };
+
+//         console.log(`📌 Entrando diretamente no setor único: ${setorUnico.nome}`);
+
+//         await sock.sendMessage(sender, {
+//           text: setorUnico.fluxo?.mensagemInicial ||
+//             `📍 Você está no setor ${setorUnico.nome}. Como posso ajudar?`
+//         });
+
+//         return;
+//       }
+
+//       // Mais de um setor
+//       atendimentosManuais[chaveAtendimento] = { etapa: 'escolha_setor', ativo: false };
+
+//       const listaSetores = setoresAtivos
+//         .map((s, i) => `${i + 1} - ${s.nome}`)
+//         .join('\n');
+
+//       await sock.sendMessage(sender, {
+//         text: `Olá! 👋 Escolha um setor:\n\n${listaSetores}\n\nDigite #sair para cancelar`
+//       });
+
+//       return;
+//     }
+
+//     // === Escolha de Setor ===
+//     if (atendimentosManuais[chaveAtendimento]?.etapa === 'escolha_setor') {
+//       const indexEscolhido = parseInt(textoLower) - 1;
+//       const setores = empresaDB.setores.filter(s => s.ativo);
+//       const setorValido = indexEscolhido >= 0 && indexEscolhido < setores.length;
+
+//       if (setorValido) {
+//         const setorEscolhido = setores[indexEscolhido];
+//         atendimentosManuais[chaveAtendimento] = {
+//           setorAtual: setorEscolhido.nome,
+//           etapa: 'atendimento',
+//           ativo: false
+//         };
+
+//         console.log(`📍 Setor selecionado: ${setorEscolhido.nome}`);
+
+//         await sock.sendMessage(sender, {
+//           text: setorEscolhido.fluxo?.mensagemInicial || `📍 Você está no setor ${setorEscolhido.nome}. Como posso ajudar?`
+//         });
+
+//         return;
+//       } else {
+//         await sock.sendMessage(sender, { text: '❌ Opção inválida. Por favor, escolha um número da lista.' });
+//         return;
+//       }
+//     }
+
+//     // === Atendimento do Setor ===
+//     if (atendimentosManuais[chaveAtendimento]?.etapa === 'atendimento') {
+//       const setorAtual = atendimentosManuais[chaveAtendimento].setorAtual;
+
+//       await sock.sendPresenceUpdate('composing', sender);
+
+//       const resposta = await handleMensagem(
+//         empresaDB._id,
+//         setorAtual,
+//         textoLower
+//       );
+
+//       console.log(`🧠 Resposta IA (${setorAtual}):`, resposta);
+
+//       await sock.sendMessage(sender, { text: resposta.resposta });
+
+//       if (resposta.proximoSetor) {
+//         atendimentosManuais[chaveAtendimento].setorAtual = resposta.proximoSetor;
+//         await new Promise(resolve => setTimeout(resolve, 500));
+
+//         const novaResposta = await handleMensagem(
+//           empresaDB._id,
+//           resposta.proximoSetor,
+//           ''
+//         );
+
+//         await sock.sendMessage(sender, { text: novaResposta.resposta });
+//       }
+
+//       return;
+//     }
+
+//     // === Mensagem fora de fluxo ===
+//     await sock.sendMessage(sender, {
+//       text: '❓ Não entendi. Digite "oi" para começar ou #sair para reiniciar.'
+//     });
+
+//   } catch (err) {
+//     console.error('❌ Erro no processamento da mensagem:', err);
 //     try {
-//       console.log("Prompt enviado para IA:", prompt);
-
-//       const resposta = await gerarRespostaGemini(prompt, pergunta);
-//       console.log("Resposta da IA:", resposta);
-
-//       await sock.sendMessage(remoteJid, { text: resposta }, { quoted: msg });
-//     } catch (erro) {
-//       console.error("Erro ao processar mensagem:", erro);
+//       await sock.sendMessage(m?.messages?.[0]?.key?.remoteJid || 'desconhecido', {
+//         text: '⚠️ Ocorreu um erro. Tente novamente mais tarde.'
+//       });
+//     } catch (erroEnvio) {
+//       console.error('Erro ao enviar mensagem de erro:', erroEnvio);
 //     }
 //   }
 // });
