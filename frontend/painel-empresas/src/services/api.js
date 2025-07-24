@@ -2,7 +2,7 @@ import axios from 'axios';
 
 // Use a URL local fixa para desenvolvimento
 const api = axios.create({
-  baseURL: 'http://localhost:3000/api',
+  baseURL: 'https://njbot-multi-15.onrender.com/api',
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',
