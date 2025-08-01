@@ -1,62 +1,16 @@
-// handlers/chatbot.js
 const Empresa = require('../models/Empresa');
-const { gerarRespostaGemini } = require('../gemini'); // ou use alias
+const { gerarRespostaOpenRouter } = require('../gemini');
 
-async function handleMensagem(empresaId, setorNome, mensagemUsuario) {
+async function handleMensagem(empresaId, mensagemUsuario) {
   const empresa = await Empresa.findById(empresaId);
-  console.log('handleMensagem:', empresaId, setorNome, mensagemUsuario);
-  
-  if (!empresa?.botAtivo) {
-    throw new Error('Empresa não encontrada ou bot desativado');
-  }
+  if (!empresa) return { resposta: '⚠️ Empresa não encontrada.' };
 
-  const setor = empresa.setores.find(s => 
-    s.nome.toLowerCase() === setorNome.toLowerCase() && s.ativo
-  );
+  const promptCompleto = `${empresa.promptIA}\nUsuário: ${mensagemUsuario}\nIA:`;
+  const respostaIA = await gerarRespostaOpenRouter(promptCompleto, mensagemUsuario);
 
-  if (!setor) {
-    return {
-      resposta: `Setor ${setorNome} não encontrado. Setores disponíveis:\n` +
-        empresa.setores.filter(s => s.ativo).map(s => `• ${s.nome}`).join('\n'),
-      terminado: true
-    };
-  }
-
-  // 1. Verifica fluxo específico do setor
-  if (setor.fluxo?.opcoes?.length > 0) {
-    const opcao = setor.fluxo.opcoes.find(o => 
-      mensagemUsuario.toLowerCase().includes(o.texto.toLowerCase())
-    );
-
-    if (opcao) {
-      switch (opcao.acao) {
-        case 'encaminhar':
-          return {
-            resposta: `Encaminhando para ${opcao.destino}...`,
-            proximoSetor: opcao.destino
-          };
-        case 'resposta':
-          return { resposta: opcao.destino, terminado: true };
-        case 'finalizar':
-          return { resposta: opcao.destino, terminado: true };
-      }
-    }
-
-    return {
-      resposta: setor.fluxo.mensagemInicial,
-      opcoes: setor.fluxo.opcoes.map(o => o.texto)
-    };
-  } // respostas programadas
-
-  // 2. Fallback para IA generativa
   return {
-    resposta: await gerarRespostaGemini(setor.prompt, mensagemUsuario),
-    terminado: true
+    resposta: respostaIA
   };
-
 }
 
 module.exports = handleMensagem;
-
-// VAI LIDAR COM A PARTE DE SETORES E SE NÃO TIVER RESPOSTA VAI CHAMAR A IA
-// RESPONDE CONFORME O PROMPT? SIM agora
