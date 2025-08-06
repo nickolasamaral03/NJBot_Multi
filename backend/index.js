@@ -262,6 +262,9 @@ app.put('/api/empresas/:id', async (req, res) => {
   const { id } = req.params;
   const { nome, promptIA, telefone, botAtivo } = req.body;
 
+  console.log('🛠️ Tentando editar empresa:', id);
+  console.log('Dados recebidos:', { nome, promptIA, telefone, botAtivo });
+
   try {
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({ error: 'ID inválido' });
@@ -271,9 +274,14 @@ app.put('/api/empresas/:id', async (req, res) => {
     if (!empresaAntiga) return res.status(404).json({ error: 'Empresa não encontrada.' });
 
     const empresaAtualizada = await Empresa.findByIdAndUpdate(
-      id, { nome, promptIA, telefone, botAtivo }, { new: true, runValidators: true }
+      id,
+      { nome, promptIA, telefone, botAtivo },
+      { new: true, runValidators: true }
     );
 
+    console.log('✅ Empresa atualizada:', empresaAtualizada);
+
+    // Renomeia a pasta se necessário
     if (empresaAntiga.nome !== nome) {
       const oldPath = path.join(__dirname, 'bots', empresaAntiga.nome);
       const newPath = path.join(__dirname, 'bots', nome);
@@ -286,10 +294,11 @@ app.put('/api/empresas/:id', async (req, res) => {
 
     return res.json(empresaAtualizada);
   } catch (error) {
-    console.error(error);
+    console.error('❌ Erro ao atualizar empresa:', error);
     return res.status(500).json({ error: 'Erro ao atualizar empresa.' });
   }
 });
+
 
 app.post('/api/reiniciar-bot/:id', async (req, res) => {
   const { id } = req.params;
@@ -350,6 +359,49 @@ app.delete('/api/empresas/:id', async (req, res) => {
   }
 });
 
+// VERIFICANDO O PORQUE DO TOGGLE NÃO FICAR ATIVO NOVAMENTE
+// app.put('/api/empresas/:id/toggle-bot', async (req, res) => {
+//   try {
+//     const { id } = req.params;
+//     if (!mongoose.Types.ObjectId.isValid(id)) {
+//       return res.status(400).json({ error: 'ID inválido' });
+//     }
+
+//     const empresa = await Empresa.findById(id);
+//     if (!empresa) return res.status(404).json({ message: 'Empresa não encontrada' });
+
+//     empresa.botAtivo = !empresa.botAtivo;
+//     await empresa.save();
+
+//     if (!empresa.botAtivo && bots[empresa.nome]) {
+//       try {
+//         // await bots[empresa.nome].ws.close();
+//         if (bots[empresa.nome].end) {
+//         await bots[empresa.nome].end(); // força desconexão
+//       } else {
+//         await bots[empresa.nome].logout?.(); // alternativa para encerrar sessão
+//       }
+//         delete bots[empresa.nome];
+//       } catch (err) {
+//         console.error(`Erro ao desligar bot de ${empresa.nome}:`, err);
+//       }
+//     }
+
+//     if (empresa.botAtivo && !bots[empresa.nome]) {
+//       iniciarBot(empresa).then(() => {
+//         console.log(`Bot de ${empresa.nome} foi iniciado.`);
+//       }).catch(err => {
+//         console.error(`Erro ao iniciar bot de ${empresa.nome}:`, err);
+//       });
+//     }
+
+//     res.status(200).json({ botAtivo: empresa.botAtivo });
+//   } catch (error) {
+//     console.error('Erro ao alternar bot:', error);
+//     res.status(500).json({ message: 'Erro ao alternar bot' });
+//   }
+// });
+
 app.put('/api/empresas/:id/toggle-bot', async (req, res) => {
   try {
     const { id } = req.params;
@@ -360,27 +412,36 @@ app.put('/api/empresas/:id/toggle-bot', async (req, res) => {
     const empresa = await Empresa.findById(id);
     if (!empresa) return res.status(404).json({ message: 'Empresa não encontrada' });
 
+    // Alterna o status do bot
     empresa.botAtivo = !empresa.botAtivo;
     await empresa.save();
 
-    if (!empresa.botAtivo && bots[empresa.nome]) {
+    // Recarrega a empresa atualizada do banco para garantir dados atualizados
+    const empresaAtualizada = await Empresa.findById(id);
+
+    // Se bot foi desativado, fecha conexão se existir
+    if (!empresaAtualizada.botAtivo && bots[empresaAtualizada.nome]) {
       try {
-        await bots[empresa.nome].ws.close();
-        delete bots[empresa.nome];
+        await bots[empresaAtualizada.nome].ws.close();
+        delete bots[empresaAtualizada.nome];
+        console.log(`Bot de ${empresaAtualizada.nome} foi desligado.`);
       } catch (err) {
-        console.error(`Erro ao desligar bot de ${empresa.nome}:`, err);
+        console.error(`Erro ao desligar bot de ${empresaAtualizada.nome}:`, err);
       }
     }
 
-    if (empresa.botAtivo && !bots[empresa.nome]) {
-      iniciarBot(empresa).then(() => {
-        console.log(`Bot de ${empresa.nome} foi iniciado.`);
-      }).catch(err => {
-        console.error(`Erro ao iniciar bot de ${empresa.nome}:`, err);
-      });
+    // Se bot foi ativado e não está rodando, inicia ele
+    if (empresaAtualizada.botAtivo && !bots[empresaAtualizada.nome]) {
+      iniciarBot(empresaAtualizada)
+        .then(() => {
+          console.log(`Bot de ${empresaAtualizada.nome} foi iniciado.`);
+        })
+        .catch(err => {
+          console.error(`Erro ao iniciar bot de ${empresaAtualizada.nome}:`, err);
+        });
     }
 
-    res.status(200).json({ botAtivo: empresa.botAtivo });
+    res.status(200).json({ botAtivo: empresaAtualizada.botAtivo });
   } catch (error) {
     console.error('Erro ao alternar bot:', error);
     res.status(500).json({ message: 'Erro ao alternar bot' });

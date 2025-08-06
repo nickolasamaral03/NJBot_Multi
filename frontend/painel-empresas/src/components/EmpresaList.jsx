@@ -194,7 +194,6 @@ const EmpresasList = () => {
       nome: formData.nome.trim(),
       telefone: formData.telefone.trim(),
       promptIA: formData.promptIA.trim(),
-      setores: [], // garantimos que vai sem setores
       botAtivo: formData.botAtivo
     };
 
