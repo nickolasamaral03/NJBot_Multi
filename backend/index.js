@@ -9,6 +9,7 @@ const { gerarRespostaGemini } = require('./gemini');
 const { default: makeWASocket, DisconnectReason, useMultiFileAuthState } = require('@whiskeysockets/baileys');
 const { Boom } = require('@hapi/boom');
 const Empresa = require('./models/Empresa');
+const empresaDB = require('./models/Empresa');
 const jwt = require('jsonwebtoken');
 const handleMensagem = require('./handlers/chatbot');
 
@@ -57,10 +58,22 @@ async function iniciarBot(empresa) {
       resolveQRCode(qr);
     }
 
+    // if (connection === 'close') {
+    //   const shouldReconnect = (lastDisconnect?.error)?.output?.statusCode !== DisconnectReason.loggedOut;
+    //   if (shouldReconnect) iniciarBot(empresa);
+    // }
+
     if (connection === 'close') {
-      const shouldReconnect = (lastDisconnect?.error)?.output?.statusCode !== DisconnectReason.loggedOut;
-      if (shouldReconnect) iniciarBot(empresa);
+    const shouldReconnect = (lastDisconnect?.error)?.output?.statusCode !== DisconnectReason.loggedOut;
+
+    const empresaDB = await Empresa.findById(empresa._id); // PEGA O STATUS ATUAL DO BANCO
+    if (shouldReconnect && empresaDB?.botAtivo) {
+      console.log(`[RECONNECT] Reconectando bot de ${empresaDB.nome}...`);
+      iniciarBot(empresaDB);
+    } else {
+      console.log(`[RECONNECT] Não reconectando: botAtivo=${empresaDB?.botAtivo}`);
     }
+  }
 
     if (connection === 'open') {
       console.log(`🤖 Conectado com sucesso: ${empresa.nome}`);
@@ -88,13 +101,21 @@ async function iniciarBot(empresa) {
       const comandosPermitidosMesmoFromMe = ['#bot', '#sair', '#encerrar', 'bot'];
       if (msg.key.fromMe && !comandosPermitidosMesmoFromMe.includes(textoLower)) return;
 
-      const empresaDB = empresa;
-      if (!empresaDB?.botAtivo) {
-        console.log(`⚠️ Bot da empresa "${empresaDB.nome}" está desativado. Ignorando mensagem.`);
+      // 🔄 Buscar empresa atualizada do banco
+      // const empresaDB = await Empresa.findOne({ numeroWhatsapp: sender });
+      // if (!empresaDB?.botAtivo) {
+      //   console.log(`⚠️ Bot da empresa "${empresaDB?.nome || empresa.nome}" está desativado. Ignorando mensagem.`);
+      //   return;
+      // }
+// Busque novamente do banco para garantir valor atualizado
+      const empresaAtualizada = await Empresa.findById(empresa._id);
+
+      if (!empresaAtualizada?.botAtivo) {
+        console.log(`⚠️ Bot da empresa "${empresaAtualizada?.nome || empresa.nome}" está desativado. Ignorando mensagem.`);
         return;
       }
 
-      const chaveAtendimento = `${empresaDB._id}_${sender}`;
+      const chaveAtendimento = `${empresaAtualizada._id}_${sender}`;
       const saudacoes = ['oi', 'olá', 'ola', 'bom dia', 'boa tarde', 'boa noite'];
       const comandosEspeciais = ['#sair', '#bot', 'bot'];
 
@@ -174,6 +195,7 @@ setInterval(() => {
   }
 }, 60 * 1000);
 
+
 // Iniciar todos os bots
 async function iniciarTodosBots() {
   const empresas = await Empresa.find();
@@ -243,7 +265,7 @@ app.get('/api/qr/:id', async (req, res) => {
       return res.status(400).json({ error: 'ID inválido' });
     }
 
-    const empresa = await Empresa.findById(id);
+    const empresa = await empresaDB.findById(id);
     if (!empresa) return res.status(404).json({ error: 'Empresa não encontrada.' });
 
     const qr = qrCodesGerados[empresa.nome];
@@ -281,13 +303,14 @@ app.put('/api/empresas/:id', async (req, res) => {
 
     console.log('✅ Empresa atualizada:', empresaAtualizada);
 
-    // Renomeia a pasta se necessário
+    // Renomeia a pasta se o nome mudou
     if (empresaAntiga.nome !== nome) {
       const oldPath = path.join(__dirname, 'bots', empresaAntiga.nome);
       const newPath = path.join(__dirname, 'bots', nome);
       if (fs.existsSync(oldPath)) fs.renameSync(oldPath, newPath);
     }
 
+    // Cria/atualiza a pasta com o novo prompt
     const pasta = path.join(__dirname, 'bots', nome);
     if (!fs.existsSync(pasta)) fs.mkdirSync(pasta, { recursive: true });
     fs.writeFileSync(path.join(pasta, 'prompt.txt'), promptIA);
@@ -360,93 +383,69 @@ app.delete('/api/empresas/:id', async (req, res) => {
 });
 
 // VERIFICANDO O PORQUE DO TOGGLE NÃO FICAR ATIVO NOVAMENTE
-// app.put('/api/empresas/:id/toggle-bot', async (req, res) => {
-//   try {
-//     const { id } = req.params;
-//     if (!mongoose.Types.ObjectId.isValid(id)) {
-//       return res.status(400).json({ error: 'ID inválido' });
-//     }
-
-//     const empresa = await Empresa.findById(id);
-//     if (!empresa) return res.status(404).json({ message: 'Empresa não encontrada' });
-
-//     empresa.botAtivo = !empresa.botAtivo;
-//     await empresa.save();
-
-//     if (!empresa.botAtivo && bots[empresa.nome]) {
-//       try {
-//         // await bots[empresa.nome].ws.close();
-//         if (bots[empresa.nome].end) {
-//         await bots[empresa.nome].end(); // força desconexão
-//       } else {
-//         await bots[empresa.nome].logout?.(); // alternativa para encerrar sessão
-//       }
-//         delete bots[empresa.nome];
-//       } catch (err) {
-//         console.error(`Erro ao desligar bot de ${empresa.nome}:`, err);
-//       }
-//     }
-
-//     if (empresa.botAtivo && !bots[empresa.nome]) {
-//       iniciarBot(empresa).then(() => {
-//         console.log(`Bot de ${empresa.nome} foi iniciado.`);
-//       }).catch(err => {
-//         console.error(`Erro ao iniciar bot de ${empresa.nome}:`, err);
-//       });
-//     }
-
-//     res.status(200).json({ botAtivo: empresa.botAtivo });
-//   } catch (error) {
-//     console.error('Erro ao alternar bot:', error);
-//     res.status(500).json({ message: 'Erro ao alternar bot' });
-//   }
-// });
-
 app.put('/api/empresas/:id/toggle-bot', async (req, res) => {
   try {
     const { id } = req.params;
+
+    console.log(`[TOGGLE] Requisição recebida para ID: ${id}`);
+
     if (!mongoose.Types.ObjectId.isValid(id)) {
+      console.log(`[TOGGLE] ID inválido: ${id}`);
       return res.status(400).json({ error: 'ID inválido' });
     }
 
     const empresa = await Empresa.findById(id);
-    if (!empresa) return res.status(404).json({ message: 'Empresa não encontrada' });
+    if (!empresa) {
+      console.log(`[TOGGLE] Empresa não encontrada: ${id}`);
+      return res.status(404).json({ message: 'Empresa não encontrada' });
+    }
 
-    // Alterna o status do bot
+    // Invertendo o estado do bot
     empresa.botAtivo = !empresa.botAtivo;
+    console.log(`[TOGGLE] Novo status de botAtivo: ${empresa.botAtivo}`);
+
     await empresa.save();
+    console.log(`[TOGGLE] Empresa ${empresa.nome} atualizada no banco.`);
 
-    // Recarrega a empresa atualizada do banco para garantir dados atualizados
-    const empresaAtualizada = await Empresa.findById(id);
-
-    // Se bot foi desativado, fecha conexão se existir
-    if (!empresaAtualizada.botAtivo && bots[empresaAtualizada.nome]) {
+    // Se for desativar o bot
+    if (!empresa.botAtivo && bots[empresa.nome]) {
+      console.log(`[TOGGLE] Desligando bot de ${empresa.nome}...`);
       try {
-        await bots[empresaAtualizada.nome].ws.close();
-        delete bots[empresaAtualizada.nome];
-        console.log(`Bot de ${empresaAtualizada.nome} foi desligado.`);
+        if (bots[empresa.nome].end) {
+          await bots[empresa.nome].end();
+          console.log(`[TOGGLE] Bot encerrado via .end()`);
+        } else if (bots[empresa.nome].logout) {
+          await bots[empresa.nome].logout();
+          console.log(`[TOGGLE] Bot encerrado via .logout()`);
+        } else {
+          console.warn(`[TOGGLE] Nenhum método de encerramento disponível para ${empresa.nome}`);
+        }
+
+        delete bots[empresa.nome];
+        console.log(`[TOGGLE] Bot removido do cache.`);
       } catch (err) {
-        console.error(`Erro ao desligar bot de ${empresaAtualizada.nome}:`, err);
+        console.error(`[TOGGLE] Erro ao desligar bot de ${empresa.nome}:`, err);
       }
     }
 
-    // Se bot foi ativado e não está rodando, inicia ele
-    if (empresaAtualizada.botAtivo && !bots[empresaAtualizada.nome]) {
-      iniciarBot(empresaAtualizada)
-        .then(() => {
-          console.log(`Bot de ${empresaAtualizada.nome} foi iniciado.`);
-        })
-        .catch(err => {
-          console.error(`Erro ao iniciar bot de ${empresaAtualizada.nome}:`, err);
-        });
+    // Se for ativar e o bot não estiver em cache
+    if (empresa.botAtivo && !bots[empresa.nome]) {
+      console.log(`[TOGGLE] Iniciando bot de ${empresa.nome}...`);
+      try {
+        await iniciarBot(empresa);
+        console.log(`[TOGGLE] Bot de ${empresa.nome} foi iniciado com sucesso.`);
+      } catch (err) {
+        console.error(`[TOGGLE] Erro ao iniciar bot de ${empresa.nome}:`, err);
+      }
     }
 
-    res.status(200).json({ botAtivo: empresaAtualizada.botAtivo });
+    res.status(200).json({ botAtivo: empresa.botAtivo });
   } catch (error) {
-    console.error('Erro ao alternar bot:', error);
+    console.error('[TOGGLE] Erro geral ao alternar bot:', error);
     res.status(500).json({ message: 'Erro ao alternar bot' });
   }
 });
+
 
 app.get('/', (req, res) => {
   res.send('🤖 API do NJBot está rodando!');
