@@ -84,3 +84,5 @@ startBot();
 
 // AIzaSyD6XaR03qdOOtWzsjZK4ARW0c7AJTWBbQc
 
+// APAGAR DEPOIS
+

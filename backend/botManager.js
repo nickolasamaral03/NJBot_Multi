@@ -140,16 +140,21 @@ sock.ev.on('messages.upsert', async (m) => {
       '';
 
     const textoLower = texto.toLowerCase().trim();
+    const chaveAtendimento = `${empresa._id}_${sender}`;
 
-    const comandosPermitidosMesmoFromMe = ['#bot', '#sair', '#encerrar', 'bot'];
-    if (msg.key.fromMe && !comandosPermitidosMesmoFromMe.includes(textoLower)) return;
+    // Verifica se é uma mensagem do atendente (fromMe) E não é um comando especial
+    const comandosPermitidosFromMe = ['#bot', '#sair', '#encerrar', 'bot'];
+    if (msg.key.fromMe && !comandosPermitidosFromMe.includes(textoLower)) {
+      // Ativa modo humano apenas se for mensagem real do atendente (não comando)
+      atendimentosManuais[chaveAtendimento] = { ativo: true, ultimoContato: new Date() };
+      console.log(`👤 Atendente humano respondendo para ${sender}. Bot pausado.`);
+      return;
+    }
 
     const empresaAtualizada = await empresaDB.findById(empresa._id);
     if (!empresaAtualizada?.botAtivo) return;
 
-    const chaveAtendimento = `${empresaAtualizada._id}_${sender}`;
-
-    // BLOQUEIO: se atendimento humano ativo, para aqui
+    // Se atendimento humano já está ativo, apenas atualiza o timestamp
     if (atendimentosManuais[chaveAtendimento]?.ativo) {
       atendimentosManuais[chaveAtendimento].ultimoContato = new Date();
       console.log(`👤 Atendimento humano ativo para: ${sender}. Bot automático pausado.`);
@@ -196,7 +201,6 @@ sock.ev.on('messages.upsert', async (m) => {
     console.error('❌ Erro no processamento da mensagem:', err);
   }
 });
-
 
   bots[empresa.nome] = sock;
   // Retorna a QR code já em base64 para facilitar front
