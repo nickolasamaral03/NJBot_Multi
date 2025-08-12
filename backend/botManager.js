@@ -7,7 +7,7 @@ const empresaDB = require('./models/Empresa');
 const handleMensagem = require('./handlers/chatbot');
 
 const bots = {};  // cache { nomeEmpresa: sock }
-const atendimentosManuais = {};  // { chaveEmpresa_remetente: { ativo, ultimoContato } }
+const atendimentosManuais = {};  // { chaveEmpresa_remetente: { ativo, ultimoContato, nomeEmpresa } }
 const qrCodesGerados = {}; // { nomeEmpresa: base64QR }
 
 async function iniciarBot(empresa) {
@@ -47,163 +47,85 @@ async function iniciarBot(empresa) {
     }
   });
 
-//   sock.ev.on('messages.upsert', async (m) => {
-//     try {
-//       const msg = m.messages?.[0];
-//       const sender = msg.key.remoteJid;
-//       if (!msg || !msg.message) return;
+  sock.ev.on('messages.upsert', async (m) => {
+    try {
+      const msg = m.messages?.[0];
+      const sender = msg.key.remoteJid;
+      if (!msg || !msg.message) return;
 
-//       const texto =
-//         msg.message?.conversation ||
-//         msg.message?.extendedTextMessage?.text ||
-//         msg.message?.imageMessage?.caption ||
-//         msg.message?.videoMessage?.caption ||
-//         msg.message?.documentMessage?.caption ||
-//         msg.message?.buttonsResponseMessage?.selectedButtonId ||
-//         msg.message?.listResponseMessage?.singleSelectReply?.selectedRowId ||
-//         '';
+      const texto =
+        msg.message?.conversation ||
+        msg.message?.extendedTextMessage?.text ||
+        msg.message?.imageMessage?.caption ||
+        msg.message?.videoMessage?.caption ||
+        msg.message?.documentMessage?.caption ||
+        msg.message?.buttonsResponseMessage?.selectedButtonId ||
+        msg.message?.listResponseMessage?.singleSelectReply?.selectedRowId ||
+        '';
 
-//       const textoLower = texto.toLowerCase().trim();
-//       const comandosPermitidosMesmoFromMe = ['#bot', '#sair', '#encerrar', 'bot'];
-//       if (msg.key.fromMe && !comandosPermitidosMesmoFromMe.includes(textoLower)) return;
+      const textoLower = texto.toLowerCase().trim();
+      const comandosPermitidosMesmoFromMe = ['#bot', '#sair', '#encerrar', 'bot'];
+      if (msg.key.fromMe && !comandosPermitidosMesmoFromMe.includes(textoLower)) return;
 
-//       const empresaAtualizada = await empresaDB.findById(empresa._id);
-//       if (!empresaAtualizada?.botAtivo) return;
+      const empresaAtualizada = await empresaDB.findById(empresa._id);
+      if (!empresaAtualizada?.botAtivo) return;
 
-//       const chaveAtendimento = `${empresaAtualizada._id}_${sender}`;
-//       const saudacoes = ['oi', 'olá', 'ola', 'bom dia', 'boa tarde', 'boa noite'];
-//       const comandosEspeciais = ['#sair', '#bot', 'bot'];
+      const chaveAtendimento = `${empresaAtualizada._id}_${sender}`;
+      const saudacoes = ['oi', 'olá', 'ola', 'bom dia', 'boa tarde', 'boa noite'];
+      const comandosEspeciais = ['#sair', '#bot', 'bot'];
 
-//       if (comandosEspeciais.includes(textoLower)) {
-//         if (textoLower === '#sair') {
-//           delete atendimentosManuais[chaveAtendimento];
-//           await sock.sendMessage(sender, { text: '✅ Conversa reiniciada. Digite "oi" para começar.' });
-//           return;
-//         }
-//         if (textoLower === '#bot' || textoLower === 'bot') {
-//           atendimentosManuais[chaveAtendimento] = { ativo: false };
-//           // Continuando botManager.js (completando o trecho faltante)
+      if (comandosEspeciais.includes(textoLower)) {
+        if (textoLower === '#sair') {
+          delete atendimentosManuais[chaveAtendimento];
+          await sock.sendMessage(sender, { text: '✅ Conversa reiniciada. Digite "oi" para começar.' });
+          return;
+        }
+        if (textoLower === '#bot' || textoLower === 'bot') {
+          atendimentosManuais[chaveAtendimento] = { ativo: false, nomeEmpresa: empresaAtualizada.nome };
+          await sock.sendMessage(sender, { text: '🤖 Atendimento automático ativado.' });
+          return;
+        }
+      }
 
-//           await sock.sendMessage(sender, { text: '🤖 Atendimento automático ativado.' });
-//           return;
-//         }
-//       }
+      const palavrasChaveAtendente = [
+        'atendente', 'humano', 'pessoa', 'falar com atendente', 'falar com humano',
+        'quero atendimento humano', 'quero falar com alguém', 'ajuda de um atendente',
+        'quero um atendente', 'preciso de ajuda humana'
+      ];
 
-//       const palavrasChaveAtendente = [
-//         'atendente', 'humano', 'pessoa', 'falar com atendente', 'falar com humano',
-//         'quero atendimento humano', 'quero falar com alguém', 'ajuda de um atendente',
-//         'quero um atendente', 'preciso de ajuda humana'
-//       ];
+      if (palavrasChaveAtendente.some(p => textoLower.includes(p))) {
+        atendimentosManuais[chaveAtendimento] = { 
+          ativo: true, 
+          ultimoContato: new Date(),
+          nomeEmpresa: empresaAtualizada.nome
+        };
+        await sock.sendMessage(sender, { text: '📨 Solicitação enviada ao atendente humano. Aguarde um momento.' });
+        return;
+      }
 
-//       if (palavrasChaveAtendente.some(p => textoLower.includes(p))) {
-//         atendimentosManuais[chaveAtendimento] = { ativo: true, ultimoContato: new Date() };
-//         await sock.sendMessage(sender, { text: '📨 Solicitação enviada ao atendente humano. Aguarde um momento.' });
-//         return;
-//       }
+      if (atendimentosManuais[chaveAtendimento]?.ativo) {
+        atendimentosManuais[chaveAtendimento].ultimoContato = new Date();
+        console.log(`👤 Atendimento humano ativo para: ${sender}`);
+        return;
+      }
 
-//       if (atendimentosManuais[chaveAtendimento]?.ativo) {
-//         atendimentosManuais[chaveAtendimento].ultimoContato = new Date();
-//         console.log(`👤 Atendimento humano ativo para: ${sender}`);
-//         return; // Não responde via bot automático enquanto atendimento humano estiver ativo
-//       }
+      if (saudacoes.includes(textoLower)) {
+        await sock.sendMessage(sender, {
+          text: 'Olá! 👋 Como posso te ajudar? Se quiser falar com um atendente humano, digite "atendente" ou "humano".'
+        });
+        return;
+      }
 
-//       if (saudacoes.includes(textoLower)) {
-//         await sock.sendMessage(sender, {
-//             text: 'Olá! 👋 Como posso te ajudar? Se quiser falar com um atendente humano, digite "atendente" ou "humano".'
-//         });
-//         return;
-//         }
+      await sock.sendPresenceUpdate('composing', sender);
+      const resposta = await handleMensagem(empresaAtualizada._id, textoLower);
+      await sock.sendMessage(sender, { text: resposta.resposta });
 
-//       await sock.sendPresenceUpdate('composing', sender);
-//       const resposta = await handleMensagem(empresaAtualizada._id, textoLower);
-//       await sock.sendMessage(sender, { text: resposta.resposta });
-
-//     } catch (err) {
-//       console.error('❌ Erro no processamento da mensagem:', err);
-//     }
-//   });
-
-sock.ev.on('messages.upsert', async (m) => {
-  try {
-    const msg = m.messages?.[0];
-    if (!msg || !msg.message) return;
-
-    const sender = msg.key.remoteJid;
-    const texto =
-      msg.message?.conversation ||
-      msg.message?.extendedTextMessage?.text ||
-      msg.message?.imageMessage?.caption ||
-      msg.message?.videoMessage?.caption ||
-      msg.message?.documentMessage?.caption ||
-      msg.message?.buttonsResponseMessage?.selectedButtonId ||
-      msg.message?.listResponseMessage?.singleSelectReply?.selectedRowId ||
-      '';
-
-    const textoLower = texto.toLowerCase().trim();
-    const chaveAtendimento = `${empresa._id}_${sender}`;
-
-    // Verifica se é uma mensagem do atendente (fromMe) E não é um comando especial
-    const comandosPermitidosFromMe = ['#bot', '#sair', '#encerrar', 'bot'];
-    if (msg.key.fromMe && !comandosPermitidosFromMe.includes(textoLower)) {
-      // Ativa modo humano apenas se for mensagem real do atendente (não comando)
-      atendimentosManuais[chaveAtendimento] = { ativo: true, ultimoContato: new Date() };
-      console.log(`👤 Atendente humano respondendo para ${sender}. Bot pausado.`);
-      return;
+    } catch (err) {
+      console.error('❌ Erro no processamento da mensagem:', err);
     }
-
-    const empresaAtualizada = await empresaDB.findById(empresa._id);
-    if (!empresaAtualizada?.botAtivo) return;
-
-    // Se atendimento humano já está ativo, apenas atualiza o timestamp
-    if (atendimentosManuais[chaveAtendimento]?.ativo) {
-      atendimentosManuais[chaveAtendimento].ultimoContato = new Date();
-      console.log(`👤 Atendimento humano ativo para: ${sender}. Bot automático pausado.`);
-      return;
-    }
-
-    // Comandos especiais para controle do atendimento
-    if (textoLower === '#sair') {
-      delete atendimentosManuais[chaveAtendimento];
-      await sock.sendMessage(sender, { text: '✅ Conversa reiniciada. Digite "oi" para começar.' });
-      return;
-    }
-    if (textoLower === '#bot' || textoLower === 'bot') {
-      atendimentosManuais[chaveAtendimento] = { ativo: false };
-      await sock.sendMessage(sender, { text: '🤖 Atendimento automático ativado.' });
-      return;
-    }
-
-    const palavrasChaveAtendente = [
-      'atendente', 'humano', 'pessoa', 'falar com atendente', 'falar com humano',
-      'quero atendimento humano', 'quero falar com alguém', 'ajuda de um atendente',
-      'quero um atendente', 'preciso de ajuda humana'
-    ];
-
-    if (palavrasChaveAtendente.some(p => textoLower.includes(p))) {
-      atendimentosManuais[chaveAtendimento] = { ativo: true, ultimoContato: new Date() };
-      await sock.sendMessage(sender, { text: '📨 Solicitação enviada ao atendente humano. Aguarde um momento.' });
-      return;
-    }
-
-    const saudacoes = ['oi', 'olá', 'ola', 'bom dia', 'boa tarde', 'boa noite'];
-    if (saudacoes.includes(textoLower)) {
-      await sock.sendMessage(sender, {
-        text: 'Olá! 👋 Como posso te ajudar? Se quiser falar com um atendente humano, digite "atendente" ou "humano".'
-      });
-      return;
-    }
-
-    await sock.sendPresenceUpdate('composing', sender);
-    const resposta = await handleMensagem(empresaAtualizada._id, textoLower);
-    await sock.sendMessage(sender, { text: resposta.resposta });
-
-  } catch (err) {
-    console.error('❌ Erro no processamento da mensagem:', err);
-  }
-});
+  });
 
   bots[empresa.nome] = sock;
-  // Retorna a QR code já em base64 para facilitar front
   const qrCodeBase64 = await qrCodePromise.then(qr => qrcode.toDataURL(qr));
   return qrCodeBase64;
 }
@@ -216,7 +138,6 @@ async function reiniciarBot(empresa) {
   const authPath = path.join(__dirname, 'bots', empresa.nome, 'auth_info_baileys');
   if (fs.existsSync(authPath)) fs.rmSync(authPath, { recursive: true, force: true });
 
-  // Se existir bot rodando, encerra
   if (bots[empresa.nome]) {
     try {
       if (bots[empresa.nome].end) {
@@ -234,7 +155,6 @@ async function reiniciarBot(empresa) {
 }
 
 async function toggleBot(empresa) {
-  // Desliga bot
   if (!empresa.botAtivo && bots[empresa.nome]) {
     try {
       if (bots[empresa.nome].end) {
@@ -249,7 +169,6 @@ async function toggleBot(empresa) {
     }
   }
 
-  // Liga bot
   if (empresa.botAtivo && !bots[empresa.nome]) {
     try {
       await iniciarBot(empresa);
@@ -261,10 +180,8 @@ async function toggleBot(empresa) {
 }
 
 function deletarEmpresa(nomeEmpresa) {
-  // Remove QRCode cache
   delete qrCodesGerados[nomeEmpresa];
 
-  // Encerra bot se estiver rodando
   if (bots[nomeEmpresa]) {
     try {
       bots[nomeEmpresa].end ? bots[nomeEmpresa].end() : bots[nomeEmpresa].logout();
@@ -275,7 +192,7 @@ function deletarEmpresa(nomeEmpresa) {
   }
 }
 
-// Limpa atendimentosManuais inativos (10 minutos sem contato)
+// Intervalo para encerrar atendimentos inativos
 setInterval(() => {
   const agora = new Date();
 
@@ -287,8 +204,9 @@ setInterval(() => {
         atendimento.ativo = false;
         atendimento.ultimoContato = null;
 
-        const [empresaId, sender] = chave.split('_');
-        const botSock = Object.values(bots).find(sock => sock.authState.creds?.me?.id?.includes(sender?.split('@')[0]));
+        const sender = chave.split('_')[1];
+        const botSock = bots[atendimento.nomeEmpresa];
+
         if (botSock) {
           botSock.sendMessage(sender, {
             text: '🤖 Atendimento humano encerrado por inatividade. Agora você está falando com o assistente virtual novamente.'
@@ -306,4 +224,3 @@ module.exports = {
   toggleBot,
   deletarEmpresa
 };
-
